@@ -1,0 +1,12 @@
+{
+  "id": "access-control-001",
+  "category": "access_control",
+  "contract_name": "Treasury",
+  "solc_pragma": "^0.8.24",
+  "spec_file": "spec.md",
+  "roles": {
+    "initial": "Treasury_vulnerable.sol",
+    "bad_fix": "Treasury_fake.sol",
+    "good_fix": "Treasury_fixed.sol"
+  }
+}

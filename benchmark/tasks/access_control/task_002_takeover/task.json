@@ -1,0 +1,16 @@
+{
+  "id": "access-control-002-takeover",
+  "category": "access_control",
+  "contract_name": "Bank",
+  "solc_pragma": "^0.8.24",
+  "spec_file": "spec.md",
+  "roles": {
+    "initial": "Bank_vulnerable.sol",
+    "bad_fix": "Bank_bad_fix.sol",
+    "good_fix": "Bank_fixed.sol"
+  },
+  "echidna": {
+    "property_file": "EchidnaBank.sol",
+    "property_contract": "EchidnaBank"
+  }
+}

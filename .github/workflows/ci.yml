@@ -1,0 +1,76 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.3
+
+      - name: Install Python toolchain (pinned)
+        run: |
+          python -m venv .venv
+          ./.venv/bin/pip install --upgrade pip
+          ./.venv/bin/pip install -e ".[dev,analysis]"
+          ./.venv/bin/solc-select install 0.8.24
+          ./.venv/bin/solc-select use 0.8.24
+
+      - name: Install Echidna
+        run: |
+          curl -fsSL https://github.com/crytic/echidna/releases/download/v2.3.3/echidna-2.3.3-x86_64-linux.tar.gz \
+            | tar -xz -C .venv/bin echidna
+          .venv/bin/echidna --version
+
+      - name: Lint
+        run: ./.venv/bin/ruff check falsify tests
+
+      - name: Unit tests (offline)
+        run: ./.venv/bin/python -m pytest -m "not integration"
+
+      - name: Integration tests (Foundry + Slither + Echidna)
+        run: ./.venv/bin/python -m pytest -m integration
+
+      - name: CLI smoke (demo, bench, echidna)
+        run: |
+          ./.venv/bin/python -m falsify.cli demo
+          ./.venv/bin/python -m falsify.cli bench
+          ./.venv/bin/python -m falsify.cli echidna
+
+      - name: Upload run artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: falsify-results-py${{ matrix.python-version }}
+          path: results/*.json
+          if-no-files-found: ignore
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t falsify .
+
+      - name: Run demo in container
+        run: docker run --rm falsify

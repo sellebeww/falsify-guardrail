@@ -1,0 +1,12 @@
+{
+  "id": "reentrancy-001",
+  "category": "reentrancy",
+  "contract_name": "Vault",
+  "solc_pragma": "^0.8.24",
+  "spec_file": "spec.md",
+  "roles": {
+    "initial": "Vault_vulnerable.sol",
+    "bad_fix": "Vault_silenced.sol",
+    "good_fix": "Vault_fixed.sol"
+  }
+}

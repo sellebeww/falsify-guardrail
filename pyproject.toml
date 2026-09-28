@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "falsify"
+version = "0.1.0"
+description = "Exploit-confirmed guardrail for LLM-generated smart contracts"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Falsify" }]
+
+# The core engine depends only on the stdlib, so the falsification logic is testable
+# offline with no blockchain toolchain.
+dependencies = []
+
+[project.optional-dependencies]
+# Static analysis + solc management (pinned so CI matches local runs exactly).
+analysis = ["slither-analyzer==0.11.6", "crytic-compile==0.4.2", "solc-select==1.2.0"]
+dev = ["pytest==9.1.1", "ruff==0.16.9"]
+
+[project.scripts]
+falsify = "falsify.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["falsify*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+markers = [
+    "integration: requires the real toolchain (Foundry + Slither, optionally Echidna); slower",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

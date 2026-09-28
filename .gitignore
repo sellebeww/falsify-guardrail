@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Falsify run outputs (artifacts are reproducible; don't commit them)
+results/
+!results/.gitkeep
+
+# Foundry
+cache/
+out/
+broadcast/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+

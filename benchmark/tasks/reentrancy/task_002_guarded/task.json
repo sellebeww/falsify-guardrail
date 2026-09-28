@@ -1,0 +1,10 @@
+{
+  "id": "reentrancy-002-guarded-fp",
+  "category": "reentrancy",
+  "contract_name": "Vault",
+  "solc_pragma": "^0.8.24",
+  "spec_file": "spec.md",
+  "roles": {
+    "initial": "Vault_guarded.sol"
+  }
+}
