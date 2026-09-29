@@ -32,21 +32,20 @@ def test_failed_properties_helper():
 
 @pytest.mark.integration
 @pytest.mark.skipif(not EchidnaChecker().available(), reason="Echidna not installed")
-def test_echidna_falsifies_takeover_and_holds_on_fix():
+@pytest.mark.parametrize("task_dir", sorted(Path("benchmark/tasks").glob("*/*")))
+def test_echidna_cross_checks_every_task(task_dir):
     from falsify import benchmark
 
-    task = benchmark.load_task(_TASK)
-    prop_src, prop_contract = benchmark.echidna_property(_TASK)
+    task = benchmark.load_task(task_dir)
+    prop_src, prop_contract = benchmark.echidna_property(task_dir)
     checker = EchidnaChecker(test_limit=5000)
-
-    vuln = checker.run(
-        benchmark.role_source(_TASK, "initial"), task.contract_name,
-        prop_src, prop_contract, task.solc_pragma,
-    )
-    fixed = checker.run(
-        benchmark.role_source(_TASK, "good_fix"), task.contract_name,
-        prop_src, prop_contract, task.solc_pragma,
-    )
-    assert vuln.available
-    assert "echidna_owner_is_deployer" in vuln.failed_properties  # bug found independently
-    assert fixed.passed  # invariant holds on the real fix
+    roles = benchmark._meta(task_dir)["roles"]
+    for role in ("initial", "good_fix"):
+        if role not in roles:
+            continue
+        result = checker.run(
+            benchmark.role_source(task_dir, role), task.contract_name,
+            prop_src, prop_contract, task.solc_pragma, support_sources=task.support_sources,
+        )
+        assert result.properties, result.raw
+        assert result.passed == (role == "good_fix" or "good_fix" not in roles), result.raw

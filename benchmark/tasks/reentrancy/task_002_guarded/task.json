@@ -6,5 +6,9 @@
   "spec_file": "spec.md",
   "roles": {
     "initial": "Vault_guarded.sol"
+  },
+  "echidna": {
+    "property_file": "EchidnaVault.sol",
+    "property_contract": "EchidnaVault"
   }
 }

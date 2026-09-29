@@ -10,3 +10,7 @@ class LoopConfig:
     max_iterations: int = 5          # N: hard iteration budget
     stagnation_patience: int = 2     # k: reject iters with no reduction in confirmed set -> stop
     compile_fail_streak: int = 3     # m: consecutive non-compiling repairs -> abort
+
+    def __post_init__(self) -> None:
+        if self.max_iterations < 0 or self.stagnation_patience < 1 or self.compile_fail_streak < 1:
+            raise ValueError("iterations must be nonnegative; stopping thresholds must be positive")

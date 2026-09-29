@@ -45,7 +45,13 @@ class SlitherAnalyzer:
     def analyze(self, artifact: GeneratedArtifact) -> list[Finding]:
         with tempfile.TemporaryDirectory(prefix="falsify-slither-") as tmp:
             sol = Path(tmp) / f"{artifact.contract_name}.sol"
-            sol.write_text(artifact.source)
+            from falsify.oracle.foundry import _solc_pin
+            from falsify.sources import write_sources
+
+            write_sources(Path(tmp), artifact.contract_name, artifact.source,
+                          artifact.support_sources)
+            env = toolpaths.subprocess_env()
+            env["SOLC_VERSION"] = _solc_pin(artifact.solc_pragma)
             out = Path(tmp) / "slither.json"
             subprocess.run(
                 [toolpaths.slither_bin(), str(sol), "--json", str(out)],
@@ -53,12 +59,14 @@ class SlitherAnalyzer:
                 capture_output=True,
                 text=True,
                 check=False,
-                env=toolpaths.subprocess_env(),
+                env=env,
                 timeout=180,
             )
             if not out.exists():
-                return []
+                raise RuntimeError("Slither did not produce a report")
             data = json.loads(out.read_text() or "{}")
+            if not data.get("success"):
+                raise RuntimeError("Slither analysis failed")
 
         findings: list[Finding] = []
         for i, det in enumerate(data.get("results", {}).get("detectors", [])):

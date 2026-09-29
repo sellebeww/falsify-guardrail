@@ -32,7 +32,7 @@ jobs:
           python -m venv .venv
           ./.venv/bin/pip install --upgrade pip
           ./.venv/bin/pip install -e ".[dev,analysis]"
-          ./.venv/bin/solc-select install 0.8.24
+          ./.venv/bin/solc-select install 0.8.24 0.8.20
           ./.venv/bin/solc-select use 0.8.24
 
       - name: Install Echidna
@@ -74,3 +74,36 @@ jobs:
 
       - name: Run demo in container
         run: docker run --rm falsify
+
+  reusable-action:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Fixed contract passes the public action
+        uses: ./
+        with:
+          task: benchmark/tasks/reentrancy/task_001
+          source: benchmark/tasks/reentrancy/task_001/reference/Vault_fixed.sol
+      - name: Vulnerable contract is blocked by the public action
+        id: blocked
+        continue-on-error: true
+        uses: ./
+        with:
+          task: benchmark/tasks/reentrancy/task_001
+          source: benchmark/tasks/reentrancy/task_001/reference/Vault_vulnerable.sol
+          artifact: results/blocked.json
+      - name: Verify blocking and artifacts
+        env:
+          OUTCOME: ${{ steps.blocked.outcome }}
+        run: |
+          test "$OUTCOME" = failure
+          python - <<'PY'
+          import json
+          assert json.load(open('results/falsify.json'))['gate_pass'] is True
+          assert json.load(open('results/blocked.json'))['gate_pass'] is False
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: reusable-action-results
+          path: results/*.json

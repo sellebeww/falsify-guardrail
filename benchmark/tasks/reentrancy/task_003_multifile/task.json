@@ -1,0 +1,15 @@
+{
+  "id": "reentrancy-003-multifile",
+  "category": "reentrancy",
+  "contract_name": "Vault",
+  "solc_pragma": "^0.8.24",
+  "roles": {
+    "initial": "Vault_initial.sol",
+    "bad_fix": "Vault_bad_fix.sol",
+    "good_fix": "Vault_good_fix.sol"
+  },
+  "echidna": {
+    "property_file": "EchidnaVault.sol",
+    "property_contract": "EchidnaVault"
+  }
+}

@@ -25,6 +25,7 @@ class FunctionalResult:
     passed: bool
     failures: list[str] = field(default_factory=list)  # failing test names
     gas: GasProfile = field(default_factory=GasProfile)
+    coverage: dict = field(default_factory=dict)
 
 
 @runtime_checkable

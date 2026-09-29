@@ -56,10 +56,13 @@ def benchmark_to_dict(result) -> dict:
     """Serialize a BenchmarkResult (duck-typed to avoid an import cycle)."""
     c = result.confusion()
     return {
+        "mode": result.mode,
+        "model_configs": result.model_configs,
+        "evidence": "Case observations only; no statistical or safety claims.",
         "confusion": {"tp": c.tp, "fp": c.fp, "fn": c.fn, "tn": c.tn},
         "confusion_legend": {
             "fn": "RQ1: Slither clean but exploitable — false fixes a detector-gate approves",
-            "fp": "RQ2: Slither flags but safe — false positives a detector-gate blocks on",
+            "fp": "RQ2: Slither flags but no supplied exploit succeeded; unconfirmed, not proven safe",
         },
         "per_strategy": result.per_strategy(),
         "pareto_by_category": {
@@ -69,6 +72,8 @@ def benchmark_to_dict(result) -> dict:
         "runs": [
             {
                 "strategy": r.strategy,
+                "repetition": r.repetition,
+                "record": record_to_dict(r.record),
                 "task_id": r.task_id,
                 "category": r.category.value,
                 "verdict": r.record.verdict.value,

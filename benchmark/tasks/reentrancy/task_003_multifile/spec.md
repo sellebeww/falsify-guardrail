@@ -1,0 +1,1 @@
+Implement Vault using the supplied Ledger.sol accounting base (mapping(address => uint256) public balances). Expose payable deposit(), withdraw() and withdrawTo(address payable recipient). Only the caller may withdraw their own full balance, at most once. Sending to a recipient must clear the caller balance. Zero balance withdrawals revert. Import ./Ledger.sol.

@@ -1,16 +1,7 @@
-"""Benchmark mode (plan §7): run several repair *strategies* ("models") across an
-identical task set and report the results that answer the research questions.
+"""Compare fixture strategies or live generators on identical task specifications.
 
-The headline is a confusion matrix comparing, over every distinct contract state the
-loop evaluated, what a Slither-only gate would conclude vs. ground truth (the exploit
-oracle):
-
-    - FN  Slither clean, but exploitable   -> RQ1 false fixes a detector-gate waves through
-    - FP  Slither flags, but safe          -> RQ2 false positives a detector-gate blocks on
-    - TP  Slither flags, and exploitable
-    - TN  Slither clean, and safe
-
-Falsify's oracle is the ground-truth column; a detector-only loop only has the Slither column.
+Confusion counts describe agreement with the supplied exploit battery. A negative
+oracle result is unconfirmed, not proof of safety. Invalid states are excluded.
 """
 
 from __future__ import annotations
@@ -33,6 +24,7 @@ class RunResult:
     task_id: str
     category: VulnClass
     record: EvalRecord
+    repetition: int = 1
 
 
 @dataclass
@@ -46,8 +38,10 @@ class Confusion:
 @dataclass
 class BenchmarkResult:
     runs: list[RunResult] = field(default_factory=list)
+    mode: str = "fixture"
+    model_configs: list[dict] = field(default_factory=list)
 
-    # -- ground-truth vs Slither, over distinct contract states -------------- #
+    # -- supplied exploits vs Slither, over distinct contract states -------------- #
     def confusion(self) -> Confusion:
         seen: dict[tuple[str, str], tuple[bool, bool]] = {}
         for run in self.runs:
@@ -69,9 +63,14 @@ class BenchmarkResult:
         out: dict[str, dict] = {}
         for run in self.runs:
             s = out.setdefault(
-                run.strategy, {"success": 0, "blocked": 0, "false_fixes": 0, "runs": 0}
+                run.strategy, {"success": 0, "blocked": 0, "false_fixes": 0, "runs": 0,
+                               "initial_gate_pass": 0, "tool_errors": 0}
             )
             s["runs"] += 1
+            if run.record.verdict in (LoopVerdict.CLEAN, LoopVerdict.ORACLE_GAP):
+                s["initial_gate_pass"] += 1
+            if run.record.verdict is LoopVerdict.TOOL_ERROR:
+                s["tool_errors"] += 1
             s["false_fixes"] += run.record.false_fixes
             if run.record.verdict is LoopVerdict.SUCCESS:
                 s["success"] += 1
@@ -80,6 +79,8 @@ class BenchmarkResult:
         return out
 
     def pareto_by_category(self) -> dict[str, list[ParetoPoint]]:
+        if self.mode == "live":
+            return {}  # generated baselines differ across models; see docs/benchmarking.md
         # Only tasks that actually have a confirmed exploit to fix count toward a
         # strategy's security score; RQ2 false-positive tasks (nothing to fix) are excluded.
         needs_fix: dict[VulnClass, set[str]] = {}
@@ -96,7 +97,7 @@ class BenchmarkResult:
                     if r.category is cat and r.strategy == strat and r.task_id in task_ids
                 ]
                 succ = [r for r in runs if r.record.verdict is LoopVerdict.SUCCESS]
-                security = len(succ) / len(task_ids) if task_ids else 0.0
+                security = len(succ) / len(runs) if runs else 0.0
                 gas = sum(r.record.gas_tax_total() for r in succ) / len(succ) if succ else 0.0
                 points.append(ParetoPoint(label=strat, security=security, gas=gas))
             out[cat.value] = frontier(points)
@@ -106,6 +107,8 @@ class BenchmarkResult:
 def _states(run: RunResult):
     """Yield ((task_id, source_hash), slither_flags_category, oracle_exploitable) per state."""
     cat, rec = run.category, run.record
+    if not rec.initial_exploits or any(not r.executed for r in rec.initial_exploits):
+        return
     yield (
         (rec.task_id, rec.initial_source_hash),
         # The Slither column must reflect only what SLITHER flagged — exclude
@@ -120,6 +123,8 @@ def _states(run: RunResult):
         any(r.success and r.swc_class is cat for r in rec.initial_exploits),
     )
     for a in rec.repairs:
+        if not a.exploit_results or any(not r.executed for r in a.exploit_results):
+            continue
         yield (
             (rec.task_id, a.source_hash),
             cat in a.detector_classes,
@@ -131,23 +136,39 @@ def run_benchmark(
     tasks_root: str | Path,
     strategies: list[str] | None = None,
     config: LoopConfig | None = None,
+    models=None,
+    repetitions: int = 1,
+    checkpoint: Path | None = None,
 ) -> BenchmarkResult:
+    from dataclasses import asdict
+
+    from falsify.artifacts import write_benchmark
+    from falsify.generators.http import build_model
+
+    if repetitions < 1:
+        raise ValueError("repetitions must be positive")
     strategies = strategies or list(benchmark.STRATEGIES)
     config = config or LoopConfig()
     vers = versions.capture()
-    result = BenchmarkResult()
-    for task_dir in benchmark.discover_tasks(tasks_root):
+    result = BenchmarkResult(mode="live" if models else "fixture",
+                             model_configs=[asdict(m) for m in models] if models else [])
+    task_dirs = benchmark.discover_tasks(tasks_root)
+    if not task_dirs:
+        raise ValueError("no benchmark tasks found")
+    for task_dir in task_dirs:
         task = benchmark.load_task(task_dir)
-        for strat in strategies:
-            orch = Orchestrator(
-                generator=benchmark.build_generator(task_dir, strat),
-                analyzer=SlitherAnalyzer(),
-                oracle=FoundryOracle(),
-                compiler=FoundryCompiler(),
-                tester=FoundryFunctionalTester(),
-                config=config,
-                versions=vers,
-            )
-            record = orch.run(task)
-            result.runs.append(RunResult(strat, task.id, task.category, record))
+        for entry in models or strategies:
+            for repetition in range(1, repetitions + 1):
+                generator = (build_model(entry) if models else
+                             benchmark.build_generator(task_dir, entry))
+                orch = Orchestrator(
+                    generator=generator, analyzer=SlitherAnalyzer(), oracle=FoundryOracle(),
+                    compiler=FoundryCompiler(), tester=FoundryFunctionalTester(),
+                    config=config, versions=vers,
+                )
+                record = orch.run(task)
+                result.runs.append(RunResult(entry.name if models else entry, task.id,
+                                             task.category, record, repetition))
+                if checkpoint:
+                    write_benchmark(result, checkpoint)
     return result

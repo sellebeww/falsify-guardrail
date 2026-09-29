@@ -9,6 +9,7 @@ builds and runs the relevant test files. A PoC "succeeds" iff its forge test PAS
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -46,6 +47,7 @@ class _TestOutcome:
     passed: bool
     gas: int
     reason: str = ""
+    executed: bool = True
 
 
 def _solc_pin(pragma: str, default: str = "0.8.24") -> str:
@@ -66,12 +68,17 @@ class ForgeProject:
         solc_pragma: str,
         test_files: dict[str, str] | None = None,
         keep: bool = False,
+        support_sources: dict[str, str] | None = None,
     ) -> None:
         self.contract_source = contract_source
         self.contract_name = contract_name
-        self.solc = _solc_pin(solc_pragma)
+        pin = _solc_pin(solc_pragma)
+        installed = Path(os.environ.get("SOLC_SELECT_DIR", Path.home() / ".solc-select"))
+        installed = installed / "artifacts" / f"solc-{pin}" / f"solc-{pin}"
+        self.solc = str(installed) if installed.is_file() else pin
         self.test_files = test_files or {}
         self.keep = keep
+        self.support_sources = support_sources or {}
         self._dir: Path | None = None
 
     def __enter__(self) -> Self:
@@ -79,7 +86,10 @@ class ForgeProject:
         (self._dir / "src").mkdir()
         (self._dir / "test").mkdir()
         (self._dir / "foundry.toml").write_text(_FOUNDRY_TOML.format(solc=self.solc))
-        (self._dir / "src" / f"{self.contract_name}.sol").write_text(self.contract_source)
+        from falsify.sources import write_sources
+
+        write_sources(self._dir / "src", self.contract_name,
+                      self.contract_source, self.support_sources)
         for name, source in self.test_files.items():
             (self._dir / "test" / name).write_text(source)
         return self
@@ -122,7 +132,9 @@ class ForgeProject:
             # No JSON => the test suite failed to compile/build against this contract.
             return False, []
         outcomes: list[_TestOutcome] = []
-        for suite_data in data.values():
+        if not isinstance(data, dict):
+            return False, []
+        for suite_name, suite_data in data.items():
             for fn, res in suite_data.get("test_results", {}).items():
                 kind = res.get("kind", {})
                 gas = 0
@@ -131,13 +143,29 @@ class ForgeProject:
                     gas = int(inner.get("gas", 0) or inner.get("mean_gas", 0) or 0)
                 outcomes.append(
                     _TestOutcome(
-                        name=fn,
+                        name=f"{suite_name}::{fn}",
                         passed=res.get("status") == "Success",
                         gas=gas,
                         reason=res.get("reason") or "",
+                        executed=res.get("status") in {"Success", "Failure"}
+                        and fn.startswith("test"),
                     )
                 )
-        return True, outcomes
+        return bool(outcomes) and all(o.executed for o in outcomes), outcomes
+
+    def coverage(self) -> dict:
+        from falsify.coverage import parse_lcov
+
+        proc = subprocess.run(
+            [toolpaths.forge_bin(), "coverage", "--report", "lcov",
+             "--report-file", "coverage.info"],
+            cwd=self._dir, capture_output=True, text=True, check=False,
+            env=toolpaths.subprocess_env(), timeout=TEST_TIMEOUT,
+        )
+        report = self._dir / "coverage.info"
+        if proc.returncode or not report.exists():
+            return {"available": False, "error": "forge coverage failed"}
+        return parse_lcov(report.read_text())
 
     def gas_report(self, contract_name: str) -> GasProfile:
         """Per-function mean gas for `contract_name` (from `forge test --gas-report --json`)."""
@@ -176,7 +204,8 @@ class FoundryCompiler:
     """Compile-only gate: builds the contract by itself (no tests)."""
 
     def compile(self, artifact: GeneratedArtifact, solc_pragma: str) -> CompileResult:
-        with ForgeProject(artifact.source, artifact.contract_name, solc_pragma) as proj:
+        with ForgeProject(artifact.source, artifact.contract_name, solc_pragma,
+                          support_sources=artifact.support_sources) as proj:
             return proj.build()
 
 
@@ -186,9 +215,10 @@ class FoundryFunctionalTester:
     def run(self, artifact: GeneratedArtifact, task: TaskSpec) -> FunctionalResult:
         tests = _read_task_sols(task, "tests")
         if not tests:
-            return FunctionalResult(passed=True, failures=[], gas=GasProfile())
+            return FunctionalResult(passed=False, failures=["<no functional tests>"])
         with ForgeProject(
-            artifact.source, artifact.contract_name, task.solc_pragma, test_files=tests
+            artifact.source, artifact.contract_name, task.solc_pragma, test_files=tests,
+            support_sources=artifact.support_sources
         ) as proj:
             build_ok, outcomes = proj.test()
             if not build_ok:
@@ -197,8 +227,9 @@ class FoundryFunctionalTester:
                 )
             # Per-function gas of the contract under test (RQ3), measured in the same project.
             gas = proj.gas_report(artifact.contract_name)
+            coverage = proj.coverage()
         failures = [o.name for o in outcomes if not o.passed]
-        return FunctionalResult(passed=not failures, failures=failures, gas=gas)
+        return FunctionalResult(passed=not failures, failures=failures, gas=gas, coverage=coverage)
 
 
 class FoundryOracle:
@@ -216,14 +247,15 @@ class FoundryOracle:
         if not pocs:
             return []
         with ForgeProject(
-            artifact.source, artifact.contract_name, task.solc_pragma, test_files=pocs
+            artifact.source, artifact.contract_name, task.solc_pragma, test_files=pocs,
+            support_sources=artifact.support_sources
         ) as proj:
             build_ok, outcomes = proj.test()
         if not build_ok:
             # PoC could not build against this contract -> cannot confirm (not "safe").
             return [
                 ExploitResult(poc_id=name, swc_class=task.category, success=False,
-                              revert_reason="poc failed to build")
+                              revert_reason="poc failed to build or execute", executed=False)
                 for name in pocs
             ]
         results = []

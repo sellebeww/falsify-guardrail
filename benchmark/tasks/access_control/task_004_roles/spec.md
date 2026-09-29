@@ -1,0 +1,1 @@
+Implement Wallet. Constructor sets public owner to deployer. Expose deposit() payable and release(address payable to, uint amount) which sends funds only for authorized callers. Expose grant(address) for the owner to authorize an operator; operators can release funds.

@@ -72,4 +72,37 @@ def test_benchmark_shows_false_fixes_and_a_false_positive():
 
     per_strategy = result.per_strategy()
     assert per_strategy["detector_gamer"]["success"] == 0      # gaming never yields a real fix
-    assert per_strategy["proper_fixer"]["success"] >= 3        # real fixes are accepted
+    assert per_strategy["eventually_fixer"]["success"] == 7
+    assert per_strategy["proper_fixer"]["success"] == 7        # real fixes are accepted
+
+
+@pytest.mark.skipif(not _have_tools(), reason="Foundry/Slither not installed")
+@pytest.mark.parametrize("task_dir", sorted((_REPO / "benchmark/tasks").glob("*/*")))
+def test_reference_controls_have_functional_coverage(task_dir):
+    from falsify import benchmark
+    from falsify.oracle.foundry import FoundryFunctionalTester
+    from falsify.types import GeneratedArtifact
+
+    task = benchmark.load_task(task_dir)
+    for role in benchmark._meta(task_dir)["roles"]:
+        artifact = GeneratedArtifact(task.id, "reference", benchmark.role_source(task_dir, role),
+                                     task.contract_name, support_sources=task.support_sources)
+        result = FoundryFunctionalTester().run(artifact, task)
+        assert result.passed, result.failures
+        assert result.coverage["available"], result.coverage
+        assert result.coverage["lines_found"] > 0
+        assert result.coverage["functions_hit"] > 0
+
+
+@pytest.mark.skipif(not _have_tools(), reason="Foundry/Slither not installed")
+def test_check_cli_blocks_vulnerable_and_passes_fixed(tmp_path):
+    import json
+
+    from falsify.cli import main
+
+    for role, expected in [("vulnerable", 1), ("fixed", 0)]:
+        out = tmp_path / f"{role}.json"
+        code = main(["check", "--task", str(_TASK), "--source",
+                     str(_TASK / "reference" / f"Vault_{role}.sol"), "--out", str(out)])
+        assert code == expected
+        assert json.loads(out.read_text())["gate_pass"] == (expected == 0)

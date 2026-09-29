@@ -1,0 +1,55 @@
+name: Falsify Solidity guardrail
+description: Check an existing Solidity contract with trusted functional tests and exploit harnesses.
+inputs:
+  task:
+    description: Path to a trusted task directory containing task.json, tests/, and exploits/.
+    required: true
+  source:
+    description: Path to the contract entry source to evaluate.
+    required: true
+  source-root:
+    description: Optional directory containing the entry source and its Solidity imports.
+    default: ''
+  solc-version:
+    description: Compiler version matching the task pragma.
+    default: '0.8.24'
+  artifact:
+    description: Output JSON path relative to the caller workspace.
+    default: results/falsify.json
+outputs:
+  artifact:
+    description: JSON evaluation artifact path.
+    value: ${{ inputs.artifact }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v7
+      with:
+        python-version: '3.11'
+    - uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: v1.8.3
+    - name: Install Falsify and compiler
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        SOLC_PIN: ${{ inputs.solc-version }}
+      run: |
+        set -euo pipefail
+        python -m venv "$RUNNER_TEMP/falsify-venv"
+        "$RUNNER_TEMP/falsify-venv/bin/pip" install "$ACTION_PATH[analysis]"
+        "$RUNNER_TEMP/falsify-venv/bin/solc-select" install "$SOLC_PIN"
+        echo "$RUNNER_TEMP/falsify-venv/bin" >> "$GITHUB_PATH"
+        echo "SOLC_VERSION=$SOLC_PIN" >> "$GITHUB_ENV"
+    - name: Evaluate supplied source
+      shell: bash
+      env:
+        TASK_PATH: ${{ inputs.task }}
+        SOURCE_PATH: ${{ inputs.source }}
+        SOURCE_ROOT: ${{ inputs.source-root }}
+        ARTIFACT_PATH: ${{ inputs.artifact }}
+      run: |
+        set -euo pipefail
+        args=(check --task "$TASK_PATH" --source "$SOURCE_PATH" --out "$ARTIFACT_PATH")
+        if [[ -n "$SOURCE_ROOT" ]]; then args+=(--source-root "$SOURCE_ROOT"); fi
+        falsify "${args[@]}"

@@ -35,6 +35,10 @@ A repair `C → C'` is `ACCEPTED` iff **all** hold (else `REJECTED` with a reaso
 - **(c) Compiles** — `C'` compiles under pinned solc.
 - **(d) No regression** — the full PoC battery finds no *new* success on `C'` absent on `C`.
 
+All PoCs must compile and produce test outcomes. Missing or failed execution is a tool
+error, not evidence of neutralization. Initial functional failures also block even when
+no exploit succeeds. Coverage is recorded without an acceptance threshold.
+
 Gas is profiled on `C'` regardless (Δ vs `C`).
 
 ## Anti-Goodhart instrumentation
@@ -43,10 +47,10 @@ For each confirmed finding after a repair attempt (`FindingFate`):
 
 - `NEUTRALIZED` — the PoC no longer succeeds → a real fix.
 - `DETECTOR_SILENCED` — **Slither no longer reports the class, but the PoC still succeeds.**
-  This is a **false fix** (RQ1). It is counted and *never* accepted.
+  This requires an initially Slither-reported finding. It is a **false fix** (RQ1). It is counted and *never* accepted.
 - `STILL_EXPLOITABLE` — the PoC still succeeds and Slither still flags it.
 
-RQ2 (likely false positives) is not a fate: it is measured as candidate findings that stay
+RQ2 (unconfirmed candidates; not proven false positives) is not a fate: it is measured as candidate findings that stay
 `UNCONFIRMED` — the FP cell of the benchmark's Slither-vs-oracle confusion matrix.
 
 ## Loop termination (`LoopVerdict`)
@@ -58,6 +62,8 @@ RQ2 (likely false positives) is not a fate: it is measured as candidate findings
 | `ORACLE_GAP` | candidates exist but none confirmable → honestly unconfirmed | PASS (loud caveat) |
 | `ITER_BUDGET` | confirmed findings remain; iteration budget `N` exhausted | BLOCK |
 | `STAGNATION` | repair cycled, or the confirmed set stopped shrinking for `k` iters | BLOCK |
+| `TOOL_ERROR` | required analysis or oracle failed/missing | BLOCK |
+| `FUNCTIONAL_FAIL` | initial functional suite failed without a confirmed repair target | BLOCK |
 | `COMPILE_FAIL` | repairs failed to compile `m` times in a row (or initial did) | BLOCK |
 
 No terminal state silently upgrades an unconfirmed result to "secure".

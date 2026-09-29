@@ -26,7 +26,7 @@ The [`Orchestrator`](../falsify/orchestrator.py) owns the loop and the §3 seman
 ## Hermetic Foundry projects
 
 Each candidate contract is dropped into a fresh temp Foundry project containing only that
-contract plus the relevant human-owned test files. There is **no forge-std or OpenZeppelin
+entry contract, supporting source files and relevant task-owned test files. There is **no forge-std or OpenZeppelin
 dependency** — test files declare a minimal cheatcode interface inline and assert with
 `require`, so a passing test simply does not revert. This keeps runs fast, hermetic, and
 free of network installs.
@@ -39,9 +39,13 @@ repair loop producing `RepairAttempt[]` → `EvalRecord` → JSON
 
 ## Two modes, one engine
 
-- **Guardrail mode** (`falsify run`) — is this AI-written contract safe to merge? Exit code is
+- **Guardrail mode** (`falsify check`) — does the supplied contract pass the trusted harness? Exit code is
   the gate signal.
 - **Benchmark mode** (`falsify bench`, [`evaluator.py`](../falsify/evaluator.py)) — several repair
-  strategies ("models") on identical tasks → a Slither-vs-oracle confusion matrix (RQ1 false fixes
-  / RQ2 false positives) + Pareto(security vs gas) per category
+  fixture strategies or explicitly configured live models on identical tasks → a Slither-vs-oracle confusion matrix (RQ1 false fixes
+  / RQ2 unconfirmed candidates). Fixture mode additionally reports Pareto(security vs gas) per category
   ([`scoring/pareto.py`](../falsify/scoring/pareto.py)).
+
+Functional tests additionally collect production-source line/function coverage using Foundry
+LCOV. Tool failures and missing evidence block the gate. Live HTTP generation uses bounded
+requests and checkpoints complete records with source bundles and model-call usage metadata.

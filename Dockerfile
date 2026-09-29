@@ -22,12 +22,12 @@ RUN curl -fsSL "https://github.com/crytic/echidna/releases/download/v${ECHIDNA_V
     && echidna --version
 
 WORKDIR /app
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md LICENSE ./
 COPY falsify ./falsify
 
 RUN python -m venv /opt/venv \
     && pip install --no-cache-dir -e ".[dev,analysis]" \
-    && solc-select install "${SOLC_VERSION}" \
+    && solc-select install "${SOLC_VERSION}" 0.8.20 \
     && solc-select use "${SOLC_VERSION}"
 
 COPY . .

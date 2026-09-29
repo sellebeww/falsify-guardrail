@@ -12,6 +12,7 @@ fakes and no blockchain toolchain.
 from __future__ import annotations
 
 import platform
+import subprocess
 from datetime import UTC, datetime
 
 from falsify.analysis.base import StaticAnalyzer
@@ -61,13 +62,38 @@ class Orchestrator:
 
     # ------------------------------------------------------------------ #
     def run(self, task: TaskSpec) -> EvalRecord:
+        self._record = None
+        try:
+            record = self._run(task)
+            transport = getattr(self.generator, "_transport", None)
+            record.model_calls = list(getattr(transport, "calls", []))
+            return record
+        except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as exc:
+            record = self._record or EvalRecord(
+                task_id=task.id, category=task.category, model=self.generator.name,
+                versions=self.versions, verdict=LoopVerdict.TOOL_ERROR, gate_pass=False,
+                solc_pragma=task.solc_pragma,
+            )
+            record.verdict = LoopVerdict.TOOL_ERROR
+            record.notes.append(f"evaluation failed: {type(exc).__name__}: {exc}")
+            transport = getattr(self.generator, "_transport", None)
+            record.model_calls = list(getattr(transport, "calls", []))
+            return self._finalize(record)
+
+    def _run(self, task: TaskSpec) -> EvalRecord:
         cfg = self.config
         started = datetime.now(UTC).isoformat()
 
         artifact = self.generator.generate(task.nl_spec, task.contract_name, task.solc_pragma)
 
-        record = EvalRecord(
+        artifact.support_sources = dict(task.support_sources)
+        artifact.solc_pragma = task.solc_pragma
+
+        record = self._record = EvalRecord(
             task_id=task.id,
+            solc_pragma=task.solc_pragma,
+            sources={artifact.code_hash(): {"entry": artifact.source,
+                                            "support": artifact.support_sources}},
             category=task.category,
             model=self.generator.name,
             versions=self.versions,
@@ -89,6 +115,10 @@ class Orchestrator:
         findings = self.analyzer.analyze(artifact)
         initial_exploits = self.oracle.run(artifact, task)
         record.initial_exploits = initial_exploits
+        if not initial_exploits or any(not r.executed for r in initial_exploits):
+            record.verdict = LoopVerdict.TOOL_ERROR
+            record.notes.append("oracle battery missing or failed to execute")
+            return self._finalize(record)
         self._classify(findings, initial_exploits)
         self._add_oracle_discovered(findings, initial_exploits)
         record.findings = findings
@@ -97,6 +127,8 @@ class Orchestrator:
         base_functional = self.tester.run(artifact, task)
         record.gas_baseline = base_functional.gas
         record.gas_final = base_functional.gas
+        record.coverage_baseline = base_functional.coverage
+        record.coverage_final = base_functional.coverage
         if not base_functional.passed:
             record.notes.append(
                 "initial contract fails functional tests: " + ", ".join(base_functional.failures)
@@ -106,6 +138,9 @@ class Orchestrator:
 
         # No confirmed exploit -> nothing the gated loop can act on.
         if not confirmed:
+            if not base_functional.passed:
+                record.verdict = LoopVerdict.FUNCTIONAL_FAIL
+                return self._finalize(record)
             if not findings:
                 record.verdict = LoopVerdict.CLEAN
             else:
@@ -139,7 +174,10 @@ class Orchestrator:
                 last_reject_reason=last_reason,
             )
             candidate = self.generator.repair(ctx)
+            candidate.support_sources = dict(task.support_sources)
+            candidate.solc_pragma = task.solc_pragma
             h = candidate.code_hash()
+            record.sources[h] = {"entry": candidate.source, "support": candidate.support_sources}
 
             # (c) compile gate
             ccr = self.compiler.compile(candidate, task.solc_pragma)
@@ -157,11 +195,20 @@ class Orchestrator:
 
             # Evaluate the candidate.
             cand_exploits = self.oracle.run(candidate, task)
+            expected = {r.poc_id for r in initial_exploits}
+            executed = {r.poc_id for r in cand_exploits if r.executed}
+            if not expected.issubset(executed) or any(not r.executed for r in cand_exploits):
+                record.repairs.append(RepairAttempt(
+                    it, h, RepairOutcome.REJECTED, RejectReason.TOOL_ERROR,
+                    exploit_results=cand_exploits,
+                ))
+                last_reason = "oracle battery failed to execute"
+                continue
             succeeding_Cp = _succeeding(cand_exploits)
             cand_findings = self.analyzer.analyze(candidate)
             flagged_classes = {f.swc_class for f in cand_findings}
 
-            not_neutralized = original_confirming & succeeding_Cp
+            not_neutralized = succeeding_C & succeeding_Cp
             new_successes = succeeding_Cp - succeeding_C  # regression: opened a new hole
             functional = self.tester.run(candidate, task)
 
@@ -173,7 +220,7 @@ class Orchestrator:
                 flagged = f.swc_class in flagged_classes
                 if not still:
                     fates[f.id] = FindingFate.NEUTRALIZED
-                elif not flagged:
+                elif not flagged and f.detector.startswith("slither"):
                     fates[f.id] = FindingFate.DETECTOR_SILENCED  # detector quiet, exploit alive
                     false_fix_events += 1
                 else:
@@ -207,6 +254,7 @@ class Orchestrator:
             if outcome is RepairOutcome.ACCEPTED:
                 current = candidate
                 record.gas_final = functional.gas
+                record.coverage_final = functional.coverage
                 verdict = LoopVerdict.SUCCESS
                 break
 

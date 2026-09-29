@@ -1,0 +1,15 @@
+{
+  "id": "access-control-004-roles",
+  "category": "access_control",
+  "contract_name": "Wallet",
+  "solc_pragma": "^0.8.24",
+  "roles": {
+    "initial": "Wallet_initial.sol",
+    "bad_fix": "Wallet_bad_fix.sol",
+    "good_fix": "Wallet_good_fix.sol"
+  },
+  "echidna": {
+    "property_file": "EchidnaWallet.sol",
+    "property_contract": "EchidnaWallet"
+  }
+}

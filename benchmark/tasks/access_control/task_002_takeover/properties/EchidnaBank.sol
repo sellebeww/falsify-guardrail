@@ -15,7 +15,7 @@ contract EchidnaBank {
     Bank public bank;
     address private immutable deployer;
 
-    constructor() {
+    constructor() payable {
         bank = new Bank(); // this contract is the initial owner
         deployer = address(this);
     }

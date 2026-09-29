@@ -63,6 +63,7 @@ class RepairOutcome(str, Enum):
 class RejectReason(str, Enum):
     NOT_NEUTRALIZED = "not_neutralized"       # original exploit still succeeds
     FUNCTIONAL_REGRESSION = "functional_regression"  # functional tests fail
+    TOOL_ERROR = "tool_error"
     COMPILE_FAILED = "compile_failed"
     NEW_EXPLOIT_REGRESSION = "new_exploit_regression"  # fixed one, opened another
 
@@ -83,6 +84,8 @@ class LoopVerdict(str, Enum):
     """Terminal state of the repair loop (plan §3). Distinct and logged;
     an unconfirmed result is never silently upgraded to 'secure'."""
 
+    TOOL_ERROR = "tool_error"
+    FUNCTIONAL_FAIL = "functional_fail"
     SUCCESS = "success"            # confirmed findings existed and were neutralized
     CLEAN = "clean"               # no candidate findings at all (still: UNCONFIRMED != SECURE)
     ORACLE_GAP = "oracle_gap"     # candidates exist but none confirmable -> honestly unconfirmed
@@ -141,6 +144,7 @@ class TaskSpec:
     nl_spec: str
     solc_pragma: str
     contract_name: str
+    support_sources: dict[str, str] = field(default_factory=dict)
     task_dir: str | None = None   # root of the on-disk benchmark task (tests/, exploits/, ...)
 
 
@@ -156,10 +160,17 @@ class GeneratedArtifact:
     source: str                      # the Solidity source
     contract_name: str
 
+    support_sources: dict[str, str] = field(default_factory=dict)
+    solc_pragma: str = "^0.8.24"
+
     def code_hash(self) -> str:
         import hashlib
+        import json
 
-        return hashlib.sha256(self.source.encode("utf-8")).hexdigest()
+        payload = self.source
+        if self.support_sources:
+            payload += json.dumps(self.support_sources, sort_keys=True)
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 @dataclass
@@ -180,6 +191,7 @@ class ExploitResult:
     success: bool
     revert_reason: str = ""
     gas_used: int = 0
+    executed: bool = True
 
 
 @dataclass
@@ -213,8 +225,13 @@ class EvalRecord:
     final_source_hash: str = ""
     gas_baseline: GasProfile = field(default_factory=GasProfile)
     gas_final: GasProfile = field(default_factory=GasProfile)
+    coverage_baseline: dict = field(default_factory=dict)
+    coverage_final: dict = field(default_factory=dict)
     timestamps: dict = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
+    solc_pragma: str = ""
+    sources: dict[str, dict] = field(default_factory=dict)
+    model_calls: list[dict] = field(default_factory=list)
 
     def gas_tax_total(self) -> int:
         """RQ3: total gas overhead of the accepted repairs vs the baseline."""

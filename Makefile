@@ -32,7 +32,7 @@ run:
 	$(PY) -m falsify.cli run --task $(TASK) --generator $(GEN)
 
 echidna:
-	$(PY) -m falsify.cli echidna
+	$(PY) -m falsify.cli echidna --all
 
 test:
 	$(PY) -m pytest -q -m "not integration"

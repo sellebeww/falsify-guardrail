@@ -16,7 +16,7 @@ echo "==> Python venv + pinned dev/analysis deps"
 ./.venv/bin/python -m pip install --quiet -e ".[dev,analysis]"
 
 echo "==> solc ${SOLC_VERSION} via solc-select"
-./.venv/bin/solc-select install "${SOLC_VERSION}"
+./.venv/bin/solc-select install "${SOLC_VERSION}" 0.8.20
 ./.venv/bin/solc-select use "${SOLC_VERSION}"
 
 echo "==> Foundry ${FOUNDRY_VERSION}"

@@ -14,8 +14,8 @@ thing the model sees), reference/*.sol (fixture contracts keyed by role), tests/
 Only `initial` is required; bad_fix/good_fix are optional (a strategy skips roles a task
 does not define).
 
-A *strategy* is a named repair sequence over these roles — a stand-in "model" whose
-behaviour we compare on identical tasks in benchmark mode.
+A *strategy* is a named repair sequence over these roles — a scripted control whose
+behaviour we compare on identical tasks in fixture benchmark mode.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from pathlib import Path
 from falsify.generators.fixture import FixtureGenerator
 from falsify.types import TaskSpec, VulnClass
 
-# Named repair strategies (the "models" compared in benchmark mode).
+# Named fixture strategies; these are not live models.
 STRATEGIES: dict[str, list[str]] = {
     "proper_fixer": ["good_fix"],                      # fixes correctly on the first try
     "detector_gamer": ["bad_fix", "bad_fix", "bad_fix"],  # only games the detector, never fixes
@@ -54,6 +54,8 @@ def load_task(task_dir: str | Path) -> TaskSpec:
         solc_pragma=meta.get("solc_pragma", "^0.8.24"),
         contract_name=meta["contract_name"],
         task_dir=str(task_dir),
+        support_sources={p.relative_to(task_dir / "support").as_posix(): p.read_text()
+                         for p in sorted((task_dir / "support").rglob("*.sol"))},
     )
 
 
@@ -71,7 +73,7 @@ def build_generator(
         initial_source=initial,
         repair_sources=repairs,
         contract_name=meta["contract_name"],
-        name=name or f"model:{strategy}",
+        name=name or f"fixture:{strategy}",
     )
 
 

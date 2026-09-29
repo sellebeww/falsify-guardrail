@@ -19,7 +19,7 @@ from falsify import toolpaths
 # Fixed seed + single worker make every campaign reproducible (plan §9).
 _CONFIG = (
     "testMode: property\nallContracts: true\ntestLimit: {limit}\n"
-    "seed: {seed}\nworkers: 1\n"
+    "seed: {seed}\nworkers: 1\nbalanceContract: 100000000000000000000\n"
 )
 _RESULT_RE = re.compile(r"(echidna_\w+):\s*(passing|passed|failed)", re.IGNORECASE)
 TIMEOUT = 300
@@ -58,12 +58,18 @@ class EchidnaChecker:
         property_source: str,
         property_contract: str,
         solc_pragma: str = "^0.8.24",
+        support_sources: dict[str, str] | None = None,
     ) -> EchidnaResult:
         if not self.available():
             return EchidnaResult(available=False)
         with tempfile.TemporaryDirectory(prefix="falsify-echidna-") as tmp:
             d = Path(tmp)
-            (d / f"{contract_name}.sol").write_text(contract_source)
+            from falsify.oracle.foundry import _solc_pin
+            from falsify.sources import write_sources
+
+            write_sources(d, contract_name, contract_source, support_sources or {})
+            env = toolpaths.subprocess_env()
+            env["SOLC_VERSION"] = _solc_pin(solc_pragma)
             (d / f"{property_contract}.sol").write_text(property_source)
             (d / "echidna.yaml").write_text(_CONFIG.format(limit=self.test_limit, seed=self.seed))
             proc = subprocess.run(
@@ -79,7 +85,7 @@ class EchidnaChecker:
                 capture_output=True,
                 text=True,
                 check=False,
-                env=toolpaths.subprocess_env(),
+                env=env,
                 timeout=TIMEOUT,
             )
         out = proc.stdout + proc.stderr

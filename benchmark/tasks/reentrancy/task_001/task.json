@@ -8,5 +8,9 @@
     "initial": "Vault_vulnerable.sol",
     "bad_fix": "Vault_silenced.sol",
     "good_fix": "Vault_fixed.sol"
+  },
+  "echidna": {
+    "property_file": "EchidnaVault.sol",
+    "property_contract": "EchidnaVault"
   }
 }

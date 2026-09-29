@@ -25,6 +25,12 @@ def render_record(record: EvalRecord) -> str:
         f"False fixes caught (detector-silenced, RQ1): {record.false_fixes}",
         f"Gas tax total of accepted repairs (RQ3): {record.gas_tax_total():+d}",
     ]
+    cov = record.coverage_final
+    if cov.get("available"):
+        lines.append(f"Functional coverage: lines {cov['lines_hit']}/{cov['lines_found']}, "
+                     f"functions {cov['functions_hit']}/{cov['functions_found']}")
+    else:
+        lines.append("Functional coverage: unavailable")
     gas_deltas = {k: v for k, v in record.gas_final.delta(record.gas_baseline).items() if v}
     if gas_deltas:
         lines.append(
@@ -60,20 +66,21 @@ def render_benchmark(result) -> str:
             f"Falsify benchmark — {len(result.runs)} runs "
             f"({len(tasks)} tasks × {len(strategies)} strategies)"
         ),
+        "Case observations only; no statistical inference. Mode: " + result.mode,
         "",
         (
-            f"Ground truth (exploit oracle) vs a Slither-only gate, over {n_states} distinct "
+            f"Observed outcomes (supplied exploits) vs a Slither-only gate, over {n_states} distinct "
             "contract states:"
         ),
         "",
-        "                    exploitable      safe",
-        f"  Slither flags        TP={c.tp:<3}        FP={c.fp:<3}   <- FP = RQ2 false positives",
-        f"  Slither clean        FN={c.fn:<3}        TN={c.tn:<3}   <- FN = RQ1 false fixes",
+        "                    exploitable      unconfirmed",
+        f"  Slither flags        TP={c.tp:<3}        FP={c.fp:<3}   <- RQ2 unconfirmed candidates",
+        f"  Slither clean        FN={c.fn:<3}        TN={c.tn:<3}   <- RQ1 detector blind spots",
         "",
         f"  A Slither-only gate would APPROVE {c.fn} still-exploitable contract(s) (RQ1),",
-        f"  and BLOCK {c.fp} provably-safe contract(s) (RQ2). Falsify's oracle gets both right.",
+        f"  and BLOCK {c.fp} contract(s) without a successful supplied exploit (RQ2 candidates).",
         "",
-        "Per strategy (model):",
+        "Per generator:",
     ]
     for strat, s in sorted(result.per_strategy().items()):
         lines.append(

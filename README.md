@@ -1,152 +1,138 @@
 # Falsify
 
-**An exploit-confirmed guardrail for LLM-generated smart contracts.**
+**A proof-of-concept guardrail for generated Solidity, backed by executable exploits.**
 
-Most systems that use an LLM to write or repair Solidity run a loop:
-`generate → static analysis (Slither) → feedback → regenerate`. Two things make their
-"secure" claims untrustworthy:
+Falsify combines Slither findings, independent Foundry exploit harnesses, functional tests,
+line/function coverage, and gas measurements. A repair passes only when every previously
+successful exploit stops succeeding, functional tests pass, and no supplied exploit newly
+succeeds. Missing tests and tool failures block evaluation.
 
-1. **Unvalidated findings.** A Slither finding is never proven exploitable, so false
-   positives trigger pointless rewrites.
-2. **Detector-silencing (Goodhart).** A "fix" can make Slither go quiet while the bug
-   survives. The metric is optimized, not the security.
+**UNCONFIRMED means no supplied exploit succeeded. It never means SECURE.** Eight curated
+tasks are case studies, not a representative sample. RQ1/RQ2/RQ3 outputs are descriptive
+observations, not statistical findings or evidence of production readiness.
 
-Falsify treats every finding as a **conjecture** and an automated exploit as an attempted
-**falsification**. A finding counts only when a PoC exploit *succeeds*; a repair is accepted
-only when the previously-succeeding exploit now *fails*, functional tests still pass, no new
-exploit appears, and gas is recorded.
-
-> **"Exploit failed" means UNCONFIRMED, never SECURE.**
-
-## The result, on real tooling
-
-`make demo` runs one reentrancy task through live Slither + Foundry. The fixture model tries a
-detector-silencing "fix" first, then a real one:
-
-```
-Verdict: SUCCESS     Gate: PASS
-Findings: 1 confirmed, 0 unconfirmed, 0 out-of-scope   (max severity: high)
-False fixes caught (detector-silenced, RQ1): 1
-Gas tax total of accepted repairs (RQ3): +5
-Repair iterations:
-  #1  rejected  not_neutralized         fates: reentrancy-eth=detector_silenced
-  #2  accepted  -                       fates: reentrancy-eth=neutralized
-```
-
-Iteration #1 moved the ETH transfer into inline assembly — Slither's `reentrancy-eth` warning
-**disappeared**, but the PoC still drained the vault. A Slither-gated loop would have accepted
-it. Falsify rejected it as a **false fix** and only accepted the checks-effects-interactions fix.
-
-## Benchmark mode
-
-`make bench` runs several repair *strategies* ("models") across every task and compares, over
-each distinct contract state, what a **Slither-only gate** would conclude vs. ground truth
-(the **exploit oracle**). On the current set (reentrancy + access-control):
-
-```
-Ground truth (exploit oracle) vs a Slither-only gate, over 10 distinct contract states:
-                    exploitable      safe
-  Slither flags        TP=2          FP=1     <- FP = RQ2 false positives
-  Slither clean        FN=4          TN=3     <- FN = RQ1 false fixes / blind spots
-
-  A Slither-only gate would APPROVE 4 still-exploitable contract(s) (RQ1),
-  and BLOCK 1 provably-safe contract(s) (RQ2). Falsify's oracle gets both right.
-
-Per strategy (model):
-  detector_gamer     runs=4  real-fixes=0  blocked=3  false-fixes-caught=6
-  eventually_fixer   runs=4  real-fixes=3  blocked=0  false-fixes-caught=3
-  proper_fixer       runs=4  real-fixes=3  blocked=0  false-fixes-caught=0
-```
-
-Falsify is right in **both** directions where a detector-only gate is wrong:
-
-- **FN=4 (RQ1 — approved but exploitable).** Four contracts Slither calls clean but the oracle
-  drains: two detector-*silencing* fixes (reentrancy hidden in inline assembly; an access-control
-  `kill()` wrapped in a vacuous `require` that quiets `suicidal`), plus two Slither *blind spots*
-  (an ownership-takeover bug Slither's mapped detectors never see at all). A Slither-gate approves
-  all four; Falsify's exploit oracle catches every one — including bugs Slither never reported.
-- **FP=1 (RQ2 — blocked but safe).** A vault with a *custom* reentrancy guard Slither doesn't
-  recognise: flagged `reentrancy-eth`, but the PoC can't drain it. A Slither-gate would churn
-  "fixing" a safe contract; Falsify reports the finding UNCONFIRMED and moves on.
-
-## Architecture
-
-```
-              benchmark/ (human-owned: spec, tests, invariants, PoCs)
-                              │  (the model never reads tests/PoCs — §4)
-                              ▼
- TaskSpec ─▶ Generator ─▶ contract.sol ─▶ Slither ─▶ candidate findings
-           (LLM / fixture)      │          (fast, noisy)      │
-                                │                             ▼
-                                │                    Exploit Oracle ◀─ deterministic
-                                │                  (Foundry PoCs)        PoC library
-                                │                             │
-                                │        confirmed / unconfirmed / out-of-scope
-                                ▼                             ▼
-                           Repair Loop ◀── minimal feedback (class + Slither text +
-                          (LLM / fixture)   "exploit confirmed" + failing tests;
-                                │            NOT the PoC source)
-                                ▼
-        re-run oracle battery (regression) + functional tests + gas → accept / reject / stop
-                                │
-                                ▼
-                      Scorer/Reporter → JSON artifact
-```
-
-## Quickstart
+## Run locally
 
 ```bash
-make setup    # venv + Foundry + solc 0.8.24 + Slither + Echidna
-make demo     # end-to-end reentrancy task, offline & deterministic
-make bench    # all strategies × all tasks -> RQ confusion matrix + Pareto
-make echidna  # independent Echidna invariant cross-check (access-control takeover)
-make test     # fast unit tests (no toolchain needed)
-make test-int # integration tests on the real toolchain
+make setup       # Foundry, Slither, solc 0.8.24 + 0.8.20, optional Echidna
+make demo        # deterministic fixture: vulnerable -> false fix -> real fix
+make bench       # three scripted strategies across all eight tasks
+make echidna     # independent property campaigns for all eight tasks
+make test        # unit tests, including a local HTTP mock server; no paid API
+make test-int    # real toolchain integration tests
+make lint
 ```
 
-### Independent second oracle (Echidna)
+The demo catches a repair that hides an ETH transfer in assembly: Slither's warning
+disappears while the supplied exploit still drains the vault. The next repair uses
+checks-effects-interactions and passes the supplied tests. Reproduce measurements locally;
+gas values depend on compiler, EVM and test suite.
 
-The Foundry PoC is the loop's gate, but Falsify also ships human-authored **Echidna**
-invariants as an independent property-fuzzing oracle (`make echidna`). On the ownership-takeover
-task, `owner == deployer` is **falsified** on the vulnerable contract and **holds** on the fix —
-confirming the Foundry result from a completely different engine (plan §4 anti-circularity).
+## Check a contract from another repository
 
-The demo is offline and deterministic: it uses a recorded **fixture generator** (no API key).
-To drive the **LLM adapter** through the real loop, use `make run GEN=replay`: the adapter
-replays recorded model responses, verifying prompt construction, Solidity extraction, and loop
-wiring offline. To evaluate a live model, construct `LLMGenerator(transport)` with any callable
-`transport(system, prompt) -> text` for the model under test — Falsify ships no vendor-specific
-client.
+Provide a **trusted task harness** describing the contract interface, functional expectations,
+and exploit scenarios. Falsify does not automatically invent meaningful tests for arbitrary
+contracts.
 
-## Contribution (positioned honestly)
+```bash
+falsify check --task path/to/trusted-task --source contracts/Vault.sol \
+  --source-root contracts --out results/guardrail.json
+```
 
-Exploit-generation-as-oracle already exists ([V2E](https://arxiv.org/abs/2604.13611),
-[PoCo](https://doi.org/10.1145/3816704), ReX, [EvoPoC](https://arxiv.org/abs/2605.02868)), and
-"do automated fixes truly mitigate exploits?" was already studied for 20 traditional APR tools
-by [arXiv:2501.04600](https://arxiv.org/abs/2501.04600). Falsify does **not** claim to invent
-these. Our contribution is their composition and measurement:
+This evaluates the supplied source without generating or repairing it. Exit 0 means the
+supplied functional and exploit checks completed and passed the bounded gate; nonzero blocks.
+`--source-root` includes additional `.sol` files while preserving relative imports. The entry
+file must live directly inside that root. Package remappings and arbitrary Foundry projects
+are not supported yet.
 
-- **Exploit-confirmation as the acceptance *gate inside* an LLM generate-repair loop** — not
-  post-hoc validation, not detector-gated repair.
-- **Explicit detector-silencing / false-fix measurement for LLM loops** (RQ1).
-- **Pareto(confirmed-security vs gas) per contract category** on identical tasks (RQ3).
+The repository root is a reusable **composite GitHub Action**:
 
-See [docs/architecture.md](docs/architecture.md), [docs/oracle-spec.md](docs/oracle-spec.md),
-[docs/threat-model.md](docs/threat-model.md), and [docs/limitations.md](docs/limitations.md).
+```yaml
+name: Solidity guardrail
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: sellebeww/falsify-guardrail@<commit-containing-action>
+        with:
+          task: security/falsify/vault
+          source: contracts/Vault.sol
+          source-root: contracts
+          solc-version: '0.8.24'
+          artifact: results/falsify.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: falsify-report
+          path: results/falsify.json
+```
 
-## Research questions
+Replace the placeholder with a published commit containing `action.yml`. The caller owns the
+harness and artifact retention. Use isolated runners and review harness changes: this action
+executes caller-supplied Solidity tests. Local CI includes positive and negative action checks.
+See [the action contract](docs/guardrail.md).
 
-- **RQ1 — false fix rate:** what fraction of Slither-satisfying "fixes" are still exploitable?
-- **RQ2 — exploitability:** what fraction of Slither findings on LLM code are really exploitable?
-- **RQ3 — gas tax:** what does each confirmed fix cost in gas?
+## Compare actual models
 
-## Status
+The default benchmark uses **fixtures**, not LLMs. `proper_fixer`, `detector_gamer`, and
+`eventually_fixer` replay reference sources and test the gate's behavior.
 
-Two vulnerability classes (reentrancy + access-control) across four benchmark tasks, the full
-loop on real Foundry + Slither, oracle-discovered findings, an independent Echidna oracle,
-per-function gas reporting, benchmark mode with three repair strategies, a deterministic offline
-demo, JSON artifacts, CI, and a reproducible Docker image. Roadmap: more tasks per class, more
-patterns for RQ2, and a hybrid exploit-proposer that must still replay through the deterministic
-gate. **Scope/ethics:** exploits run only against this repo's own benchmark contracts inside a
-local, in-process Foundry EVM — never against live contracts. This is a defensive evaluation
-tool.
+The live mode sends identical task specifications to each configured chat-completions endpoint:
+
+```bash
+# Edit endpoint/model IDs in a copy of examples/models.json first.
+falsify bench --models examples/models.json --repetitions 3 --max-iterations 2 \
+  --out results/live.json
+falsify run --generator live --models examples/models.json --model local-model-a \
+  --task benchmark/tasks/reentrancy/task_001 --out results/live-single.json
+```
+
+Use `api_key_env` to name an environment variable for a remote credential; never put a key in
+configuration files. Requests have timeout/output-token limits and no automatic retries.
+Each completed task/model/repetition is checkpointed. No external model inference has been
+verified in this change: the HTTP path has been tested against a local mock, and model
+credentials/endpoints are still needed for a real campaign. See [benchmark protocol](docs/benchmarking.md).
+
+## Dataset and independent evidence
+
+| Task | Pattern | Compiler | Sources | Echidna property |
+| --- | --- | --- | --- | --- |
+| reentrancy-001 | External call before balance update | 0.8.24 | Single | No unearned profit |
+| reentrancy-002-guarded-fp | Custom lock, detector discrepancy | 0.8.24 | Single | No unearned profit |
+| reentrancy-003-multifile | Inherited ledger and recipient withdrawal | 0.8.24 | Multiple | No unearned profit |
+| access-control-001 | Unrestricted treasury destruction | 0.8.24 | Single | Unauthorized caller cannot drain |
+| access-control-002-takeover | Unrestricted owner replacement | 0.8.24 | Single | Ownership remains with deployer |
+| access-control-003-origin | `tx.origin` authorization through intermediary | 0.8.20 | Single | Unauthorized intermediary cannot profit |
+| access-control-004-roles | Unrestricted operator grant | 0.8.24 | Single | Unauthorized caller cannot profit |
+| access-control-005-initializer | Owner reinitialization | 0.8.24 | Single | Unauthorized caller cannot profit |
+
+Every task has functional tests, a deterministic Foundry exploit, and an Echidna property.
+Echidna is a separate report-only cross-check, with a fixed seed and bounded campaign;
+passing fuzz tests do not prove an invariant. Models see the specification and minimal repair
+feedback, never the functional tests, exploit source, or invariant source.
+
+Coverage measures production `src/` files with `forge coverage` and records line/function
+numerators and denominators, excluding test harnesses. Baseline and accepted-final coverage
+appear in JSON artifacts. Coverage is descriptive, not a security score or acceptance threshold.
+
+## Interpreting results
+
+- **RQ1:** detector-clean states with a successful supplied exploit demonstrate blind spots.
+  A detector-silenced repair is a particular event; not every blind spot is a false repair.
+- **RQ2:** detector findings without a successful supplied exploit are unconfirmed candidates.
+  Legacy `fp`/`tn` JSON keys do **not** mean proven false positives or proven safety.
+- **RQ3:** gas deltas compare an accepted repair with its own initial contract. Fixture Pareto
+  views describe this tiny dataset; live models have different generated baselines, so the
+  report does not rank them using that fixture Pareto calculation.
+
+This project explores the composition of existing static analysis, exploit validation and
+repair evaluation techniques. It does not claim to invent exploit-based validation.
+
+Read [architecture](docs/architecture.md), [oracle semantics](docs/oracle-spec.md),
+[threat model](docs/threat-model.md), [limitations](docs/limitations.md), and
+[validation record](docs/validation.md). Licensed under [Apache-2.0](LICENSE); Solidity files
+with existing MIT headers retain those terms, reproduced in [LICENSE-MIT](LICENSE-MIT).

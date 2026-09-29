@@ -8,5 +8,9 @@
     "initial": "Treasury_vulnerable.sol",
     "bad_fix": "Treasury_fake.sol",
     "good_fix": "Treasury_fixed.sol"
+  },
+  "echidna": {
+    "property_file": "EchidnaTreasury.sol",
+    "property_contract": "EchidnaTreasury"
   }
 }
