@@ -56,6 +56,43 @@ def render_record(record: EvalRecord) -> str:
     return "\n".join(lines)
 
 
+def _md(text: str) -> str:
+    """Untrusted text as inert Markdown table content."""
+    return sanitize(text).replace("|", "\\|").replace("`", "'")
+
+
+def render_markdown(record: EvalRecord) -> str:
+    """A compact Markdown summary for CI job summaries and pull-request comments."""
+    gate = "✅ PASS" if record.gate_pass else "❌ BLOCK"
+    lines = [
+        f"### Falsify guardrail: {gate}",
+        "",
+        "| Task | Verdict | Confirmed | Unconfirmed | False fixes caught |",
+        "| --- | --- | --- | --- | --- |",
+        (f"| `{record.task_id}` | `{record.verdict.value}` "
+         f"| {sum(f.status is FindingStatus.CONFIRMED for f in record.findings)} "
+         f"| {sum(f.status is FindingStatus.UNCONFIRMED for f in record.findings)} "
+         f"| {record.false_fixes} |"),
+    ]
+    exploits = record.repairs[-1].exploit_results if record.repairs else record.initial_exploits
+    if exploits:
+        lines += ["", "| Exploit | Outcome |", "| --- | --- |"]
+        for e in exploits:
+            outcome = ("**succeeded**" if e.success else
+                       "did not run" if not e.executed else "did not succeed")
+            lines.append(f"| `{_md(e.poc_id)}` | {outcome} |")
+    findings = [f for f in record.findings
+                if f.status in (FindingStatus.CONFIRMED, FindingStatus.UNCONFIRMED)]
+    if findings:
+        lines += ["", "| Finding | Status | Location |", "| --- | --- | --- |"]
+        lines += [f"| `{_md(f.detector)}` | {f.status.value} | {_md(f.location) or '-'} |"
+                  for f in findings]
+    if record.notes:
+        lines += ["", "**Notes**", ""] + [f"- {_md(n)}" for n in record.notes]
+    lines += ["", f"_{_CAVEAT}_"]
+    return "\n".join(lines) + "\n"
+
+
 def render_benchmark(result) -> str:
     """Render a BenchmarkResult (duck-typed to avoid an import cycle)."""
     c = result.confusion()

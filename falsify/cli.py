@@ -1,12 +1,15 @@
 """Falsify CLI.
 
-  falsify demo                 run the bundled reentrancy task offline (fixture generator)
-  falsify run --task DIR       run any task; --generator fixture|replay
-  falsify bench                all strategies x all tasks (benchmark mode)
-  falsify echidna --task DIR   run a task's Echidna invariant (independent oracle)
+  falsify demo                     run the bundled reentrancy task offline (fixture generator)
+  falsify run --task DIR           run any task; --generator fixture|replay|live
+  falsify bench                    all strategies x all tasks (benchmark mode)
+  falsify echidna --task DIR       run a task's Echidna invariant (independent oracle)
+  falsify validate-task --task DIR check exploits fire on exploitable controls only
+  falsify check --task DIR --source FILE
+                                   gate an existing contract; --strict, --sarif, --summary
 
-Exit code is the guardrail signal: 0 if the contract passes the confirmed-exploit gate,
-1 if it is blocked (a confirmed exploit remains).
+For `check` and `run`, the exit code is the guardrail signal: 0 if the contract passes the
+confirmed-exploit gate, 1 if it is blocked.
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from falsify import benchmark, evaluator, versions
+from falsify import __version__, benchmark, evaluator, versions
 from falsify.analysis.slither_runner import SlitherAnalyzer
 from falsify.artifacts import write_benchmark, write_record
 from falsify.config import LoopConfig
@@ -140,21 +143,43 @@ def _validate_task(task_dir: Path) -> int:
 
 
 def _check(task_dir: Path, source: Path, source_root: Path | None, out: Path,
-           strict: bool = False) -> int:
+           strict: bool = False, sarif: Path | None = None,
+           summary: Path | None = None) -> int:
+    import json
+
     from falsify import guardrail
+    from falsify.scoring.report import render_markdown
+    from falsify.scoring.sarif import to_sarif
 
     tools = guardrail.Tools(SlitherAnalyzer(), FoundryOracle(), FoundryCompiler(),
                             FoundryFunctionalTester(), versions.capture())
     support = guardrail.support_from_root(source, source_root) if source_root else None
     record = guardrail.check(task_dir, source.read_text(), tools, support, strict=strict)
     write_record(record, out)
+    if sarif:
+        sarif.parent.mkdir(parents=True, exist_ok=True)
+        sarif.write_text(json.dumps(to_sarif(record, _repo_relative(source)), indent=2) + "\n")
+    if summary:
+        summary.parent.mkdir(parents=True, exist_ok=True)
+        with summary.open("a", encoding="utf-8") as fh:  # appendable, like a CI job summary
+            fh.write(render_markdown(record))
     print(render_record(record))
     print(f"Artifact: {out}")
     return 0 if record.gate_pass else 1
 
 
+def _repo_relative(path: Path) -> str:
+    """A POSIX path relative to the working directory when possible, as SARIF expects."""
+    try:
+        return path.resolve().relative_to(Path.cwd().resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="falsify", description=__doc__)
+    parser = argparse.ArgumentParser(prog="falsify", description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--version", action="version", version=f"falsify {__version__}")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("demo", help="run the bundled reentrancy task offline")
@@ -197,6 +222,9 @@ def main(argv: list[str] | None = None) -> int:
     check.add_argument("--out", type=Path, default=Path("results/guardrail.json"))
     check.add_argument("--strict", action="store_true",
                        help="also block unconfirmed detector findings and unverified harnesses")
+    check.add_argument("--sarif", type=Path, help="also write SARIF 2.1.0 for code scanning")
+    check.add_argument("--summary", type=Path,
+                       help="append a Markdown summary (e.g. $GITHUB_STEP_SUMMARY)")
 
     args = parser.parse_args(argv)
     if args.cmd == "demo":
@@ -212,7 +240,8 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("validate-task needs --task DIR or --all")
         return max(_validate_task(t) for t in tasks)
     if args.cmd == "check":
-        return _check(args.task, args.source, args.source_root, args.out, args.strict)
+        return _check(args.task, args.source, args.source_root, args.out, args.strict,
+                      args.sarif, args.summary)
     if args.cmd == "echidna":
         if args.all:
             codes = [_run_echidna(t) for t in benchmark.discover_tasks(_REPO_ROOT / "benchmark/tasks")]
