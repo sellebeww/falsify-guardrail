@@ -1,30 +1,38 @@
 # Validation record
 
-Local verification on 2026-09-29, macOS, Python 3.11.9, Foundry 1.8.3,
+Local verification on 2026-10-11, macOS, Python 3.11.9, Foundry 1.8.3,
 Slither 0.11.6, Echidna 2.3.3, and solc 0.8.20/0.8.24.
 
 ## Executed
 
-- Full Python suite: **69 passed** (49 unit/HTTP tests and 20 real-toolchain integration
-  tests). Includes unit regressions, real loopback HTTP serialization, repeated
-  two-model mock campaigns, real Foundry/Slither loops, all reference functional suites,
-  line/function coverage, external-source CLI gate checks, and all eight Echidna campaigns.
-- `falsify bench --out results/benchmark-expanded.json`: 24 fixture runs, eight tasks,
-  three scripted strategies. `proper_fixer` and `eventually_fixer` repaired all seven
-  vulnerable tasks; `detector_gamer` repaired none and was blocked on all seven.
-- Observed states: 22 distinct task/source pairs. Slither flagged six exploited states and
-  one unconfirmed state; it did not flag eight exploited states and seven unconfirmed states.
-  These counts describe supplied harness outcomes, not statistical performance or safety.
-- Echidna: initial vulnerable references falsified in all seven vulnerable tasks; corresponding
-  fixes held for 5,000 tests with seed 1337. The guarded reference also held. These are bounded
-  property campaigns, not proofs.
-- `ruff check falsify tests`, `git diff --check`, shell syntax check, and YAML parsing for
-  `action.yml` and the CI workflow.
-- Wheel build; both Apache-2.0 and MIT license texts are included in package metadata.
-  Installed the wheel into a separate virtualenv and ran `falsify check` from outside the
-  checkout using the existing toolchain: fixed reference passed with 8/9 lines and 2/3
-  functions covered. Without Slither/solc on PATH, the smoke run correctly blocked.
-- GitHub CLI scope removal completed and verified: `delete_repo` is absent.
+- Full Python suite: **133 passed** (102 unit tests and 31 real-toolchain integration
+  tests). Includes the earlier regressions plus:
+  - an exfiltrating contract (`vm.envString` reverting with a sentinel) run through
+    `falsify check`; the sentinel appears in neither the artifact nor console output,
+  - harness validation of every bundled task, and a deliberately dead exploit that is
+    reported invalid and makes `falsify check` block instead of passing,
+  - SARIF and Markdown outputs, strict mode, record/replay transcripts (including parallel
+    replay), opt-in retries against a loopback server, and parallel benchmark ordering.
+- The integration suite passed both with `VIRTUAL_ENV` set and unset, which covers the two
+  locations solc-select uses for compiler artifacts.
+- With the old environment-copying behavior restored in memory only, the output sanitizer
+  alone still replaced the sentinel with `[redacted:FALSIFY_TEST_SECRET]`.
+- `falsify validate-task --all`: all eight tasks valid. Every exploit succeeded on its
+  exploitable controls and on none of the safe controls, and functional suites passed on
+  every control.
+- `falsify bench`: 24 fixture runs. `proper_fixer` and `eventually_fixer` repaired all seven
+  vulnerable tasks; `detector_gamer` repaired none and was blocked on all seven. Confusion
+  over 22 distinct states: TP 6, FP 1, FN 8, TN 7. `--jobs 8` produced identical confusion,
+  per-run and per-strategy results in 21 s instead of 54 s.
+- `falsify check --strict` on every task's safe reference: the seven fixes passed; the
+  guarded vault (`ORACLE_GAP`) was blocked, as specified.
+- Echidna: initial vulnerable references falsified in all seven vulnerable tasks; fixes and
+  the guarded reference held for 5,000 tests with seed 1337. These are bounded campaigns,
+  not proofs.
+- `make demo`: the assembly repair is rejected as a detector-silenced false fix in iteration
+  1 and the checks-effects-interactions repair is accepted in iteration 2.
+- `ruff check falsify tests`; YAML parsing and `bash -n` of both action steps; solc
+  derivation from task pragmas (0.8.24 and 0.8.20).
 
 JSON run artifacts are generated under ignored `results/`; they are local evidence and are
 not bundled into the source commit. Re-run the commands to reproduce case observations.
@@ -32,12 +40,14 @@ not bundled into the source commit. Re-run the commands to reproduce case observ
 ## Not executed / not claimed
 
 - **Real external model inference:** no chosen endpoint/model credentials or live-call budget
-  were supplied. HTTP tests use a loopback mock. They validate the network adapter and campaign
-  wiring, not provider compatibility, model quality or a live multi-model comparison.
-- **Hosted GitHub Actions:** the composite action and positive/negative CI job are implemented,
-  with local CLI and installation checks. A hosted run requires publishing the commit. No
-  hosted success is claimed from YAML validation.
-- **Docker runtime:** Docker is unavailable locally. Its build definition was updated to copy
-  the license and install both compiler pins; the existing hosted Docker job remains the check.
+  were supplied. HTTP, retry and transcript tests use a loopback mock. They validate the
+  adapter and campaign wiring, not provider compatibility, model quality or a live
+  multi-model comparison.
+- **Hosted GitHub Actions:** the changed composite action and CI jobs were validated locally
+  (YAML, shell syntax, the CLI paths they call). No hosted run is claimed until the commits
+  are published.
+- **Docker runtime:** Docker is unavailable locally; the hosted Docker job remains the check.
+- **Linux tool environment:** the minimal subprocess environment was verified on macOS.
+  CI on Ubuntu exercises it once the commits are published.
 - **Research validity:** eight hand-curated cases do not justify statistical significance,
   general model rankings, exhaustive vulnerability coverage, or production-readiness claims.

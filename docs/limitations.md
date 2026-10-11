@@ -13,6 +13,9 @@ Falsify can demonstrate exploitability; it cannot prove safety.
 - **Incomplete oracles.** Supplied PoCs can miss attacks. Detector-positive/unconfirmed is
   not necessarily a false positive; detector-negative/unconfirmed is not necessarily safe.
   Exploit harness build/execution failures, missing suites and tool errors block the gate.
+  Controls show that an exploit *can* fire on known-vulnerable code; they do not show that
+  it covers every variant of the vulnerability. A candidate can also detect the test
+  environment and behave differently there (see the threat model).
 - **Echidna is bounded.** Every task has a property and vulnerable/fixed controls (except the
   guarded task, which has only a non-violating reference). Seed 1337, one worker and 5,000 tests
   provide a reproducible cross-check, not an exhaustive proof. Some properties use scenario

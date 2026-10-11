@@ -142,5 +142,6 @@ repair evaluation techniques. It does not claim to invent exploit-based validati
 
 Read [architecture](docs/architecture.md), [oracle semantics](docs/oracle-spec.md),
 [threat model](docs/threat-model.md), [limitations](docs/limitations.md), and
-[validation record](docs/validation.md). Licensed under [Apache-2.0](LICENSE); Solidity files
+[validation record](docs/validation.md). See [SECURITY.md](SECURITY.md) to report a
+vulnerability and [CHANGELOG.md](CHANGELOG.md) for changes. Licensed under [Apache-2.0](LICENSE); Solidity files
 with existing MIT headers retain those terms, reproduced in [LICENSE-MIT](LICENSE-MIT).
