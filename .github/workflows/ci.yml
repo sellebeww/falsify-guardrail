@@ -23,7 +23,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09  # v1.9.1
         with:
           version: v1.8.3
 
@@ -93,6 +93,14 @@ jobs:
           task: benchmark/tasks/reentrancy/task_001
           source: benchmark/tasks/reentrancy/task_001/reference/Vault_vulnerable.sol
           artifact: results/blocked.json
+      - name: Compiler is derived from the task pragma (0.8.20), with SARIF and strict mode
+        uses: ./
+        with:
+          task: benchmark/tasks/access_control/task_003_origin
+          source: benchmark/tasks/access_control/task_003_origin/reference/Wallet_good_fix.sol
+          artifact: results/origin.json
+          sarif: results/origin.sarif
+          strict: 'true'
       - name: Verify blocking and artifacts
         env:
           OUTCOME: ${{ steps.blocked.outcome }}
@@ -102,9 +110,14 @@ jobs:
           import json
           assert json.load(open('results/falsify.json'))['gate_pass'] is True
           assert json.load(open('results/blocked.json'))['gate_pass'] is False
+          assert json.load(open('results/origin.json'))['gate_pass'] is True
+          sarif = json.load(open('results/origin.sarif'))
+          assert sarif['version'] == '2.1.0' and sarif['runs'][0]['properties']['gate_pass']
           PY
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: reusable-action-results
-          path: results/*.json
+          path: |
+            results/*.json
+            results/*.sarif

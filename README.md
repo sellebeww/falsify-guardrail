@@ -60,21 +60,25 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - uses: sellebeww/falsify-guardrail@<commit-containing-action>
+      - uses: sellebeww/falsify-guardrail@<commit-sha>
         with:
           task: security/falsify/vault
           source: contracts/Vault.sol
           source-root: contracts
-          solc-version: '0.8.24'
           artifact: results/falsify.json
+          sarif: results/falsify.sarif   # optional, for code scanning
+          strict: 'false'                # 'true' also blocks unconfirmed findings
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: falsify-report
-          path: results/falsify.json
+          path: results/falsify.*
 ```
 
-Replace the placeholder with a published commit containing `action.yml`. The caller owns the
+Pin a full commit SHA of this repository. The compiler version is derived from the task's
+`solc_pragma` (override with `solc-version`), and a result table is added to the job summary.
+To show findings in code scanning, upload the SARIF file with
+`github/codeql-action/upload-sarif` (needs `security-events: write`). The caller owns the
 harness and artifact retention. Use isolated runners and review harness changes: this action
 executes caller-supplied Solidity tests. Local CI includes positive and negative action checks.
 See [the action contract](docs/guardrail.md).

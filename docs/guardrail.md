@@ -75,6 +75,9 @@ excluding the entry. Relative paths are preserved and traversal/collisions rejec
 entry directly under that directory. Dependency packages and remappings are not resolved.
 
 The composite Action installs the toolchain on the caller's runner and invokes the same CLI.
+It derives the compiler from the task's `solc_pragma` unless `solc-version` overrides it,
+supports `strict` and `sarif` inputs, and appends a result table to the job summary
+(`job-summary: 'false'` disables it). Third-party actions it uses are pinned to commit SHAs.
 Inputs are passed as environment variables and quoted shell arguments. It needs no API key
 and no repository-write permission. The caller checks out its own repository, chooses the
 trusted task, pins the Falsify commit, and uploads the JSON artifact using `if: always()`.
