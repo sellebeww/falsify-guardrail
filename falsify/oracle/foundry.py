@@ -52,14 +52,6 @@ class _TestOutcome:
     executed: bool = True
 
 
-def _solc_pin(pragma: str, default: str = "0.8.24") -> str:
-    # Turn "^0.8.24" / ">=0.8.20" into a concrete pin; MVP fixes on the installed solc.
-    import re
-
-    m = re.search(r"(\d+\.\d+\.\d+)", pragma or "")
-    return m.group(1) if m else default
-
-
 class ForgeProject:
     """A disposable Foundry project holding one contract plus some test files."""
 
@@ -74,7 +66,7 @@ class ForgeProject:
     ) -> None:
         self.contract_source = contract_source
         self.contract_name = contract_name
-        pin = _solc_pin(solc_pragma)
+        pin = toolpaths.solc_pin(solc_pragma)
         installed = toolpaths.solc_artifact(pin)
         self.solc = str(installed) if installed else pin
         self.test_files = test_files or {}

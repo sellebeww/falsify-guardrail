@@ -65,8 +65,7 @@ class Orchestrator:
         self._record = None
         try:
             record = self._run(task)
-            transport = getattr(self.generator, "_transport", None)
-            record.model_calls = list(getattr(transport, "calls", []))
+            record.model_calls = list(getattr(self.generator, "model_calls", []))
             return record
         except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as exc:
             record = self._record or EvalRecord(
@@ -76,8 +75,7 @@ class Orchestrator:
             )
             record.verdict = LoopVerdict.TOOL_ERROR
             record.notes.append(f"evaluation failed: {type(exc).__name__}: {exc}")
-            transport = getattr(self.generator, "_transport", None)
-            record.model_calls = list(getattr(transport, "calls", []))
+            record.model_calls = list(getattr(self.generator, "model_calls", []))
             return self._finalize(record)
 
     def _run(self, task: TaskSpec) -> EvalRecord:

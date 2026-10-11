@@ -39,7 +39,7 @@ def test_echidna_cross_checks_every_task(task_dir):
     task = benchmark.load_task(task_dir)
     prop_src, prop_contract = benchmark.echidna_property(task_dir)
     checker = EchidnaChecker(test_limit=5000)
-    roles = benchmark._meta(task_dir)["roles"]
+    roles = benchmark.task_meta(task_dir)["roles"]
     for role in ("initial", "good_fix"):
         if role not in roles:
             continue

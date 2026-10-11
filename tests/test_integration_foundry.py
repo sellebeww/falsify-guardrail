@@ -84,7 +84,7 @@ def test_reference_controls_have_functional_coverage(task_dir):
     from falsify.types import GeneratedArtifact
 
     task = benchmark.load_task(task_dir)
-    for role in benchmark._meta(task_dir)["roles"]:
+    for role in benchmark.task_meta(task_dir)["roles"]:
         artifact = GeneratedArtifact(task.id, "reference", benchmark.role_source(task_dir, role),
                                      task.contract_name, support_sources=task.support_sources)
         result = FoundryFunctionalTester().run(artifact, task)

@@ -85,6 +85,11 @@ class LLMGenerator:
         self._transport = transport
         self.name = name
 
+    @property
+    def model_calls(self) -> list[dict]:
+        """Usage metadata the transport recorded, if it records any."""
+        return list(getattr(self._transport, "calls", []))
+
     def generate(self, nl_spec: str, contract_name: str, solc_pragma: str) -> GeneratedArtifact:
         raw = self._transport(SYSTEM_PROMPT, build_generate_prompt(nl_spec, contract_name, solc_pragma))
         return GeneratedArtifact(

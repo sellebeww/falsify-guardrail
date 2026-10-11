@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import atexit
 import os
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -50,6 +51,15 @@ def echidna_bin() -> str:
         "FALSIFY_ECHIDNA",
         [_VENV_BIN / "echidna", _BREW_BIN / "echidna", _BREW_BIN_INTEL / "echidna"],
     )
+
+
+DEFAULT_SOLC = "0.8.24"
+
+
+def solc_pin(pragma: str) -> str:
+    """Turn "^0.8.24" / ">=0.8.20" into a concrete compiler version (the first one named)."""
+    m = re.search(r"(\d+\.\d+\.\d+)", pragma or "")
+    return m.group(1) if m else DEFAULT_SOLC
 
 
 def solc_artifact(version: str) -> Path | None:

@@ -45,12 +45,11 @@ class SlitherAnalyzer:
     def analyze(self, artifact: GeneratedArtifact) -> list[Finding]:
         with tempfile.TemporaryDirectory(prefix="falsify-slither-") as tmp:
             sol = Path(tmp) / f"{artifact.contract_name}.sol"
-            from falsify.oracle.foundry import _solc_pin
             from falsify.sources import write_sources
 
             write_sources(Path(tmp), artifact.contract_name, artifact.source,
                           artifact.support_sources)
-            env = toolpaths.subprocess_env(solc_version=_solc_pin(artifact.solc_pragma))
+            env = toolpaths.subprocess_env(solc_version=toolpaths.solc_pin(artifact.solc_pragma))
             out = Path(tmp) / "slither.json"
             subprocess.run(
                 [toolpaths.slither_bin(), str(sol), "--json", str(out)],

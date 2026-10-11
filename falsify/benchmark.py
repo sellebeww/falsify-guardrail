@@ -37,13 +37,14 @@ STRATEGIES: dict[str, list[str]] = {
 DEFAULT_STRATEGY = "eventually_fixer"
 
 
-def _meta(task_dir: Path) -> dict:
-    return json.loads((task_dir / "task.json").read_text())
+def task_meta(task_dir: str | Path) -> dict:
+    """The parsed `task.json` of a task directory."""
+    return json.loads((Path(task_dir) / "task.json").read_text())
 
 
 def load_task(task_dir: str | Path) -> TaskSpec:
     task_dir = Path(task_dir)
-    meta = _meta(task_dir)
+    meta = task_meta(task_dir)
     spec_file = meta.get("spec_file", "spec.md")
     spec_path = task_dir / spec_file
     nl_spec = spec_path.read_text() if spec_path.exists() else meta.get("nl_spec", "")
@@ -64,7 +65,7 @@ def build_generator(
 ) -> FixtureGenerator:
     """Build a deterministic generator: initial = `vulnerable`, repairs = the strategy's roles."""
     task_dir = Path(task_dir)
-    meta = _meta(task_dir)
+    meta = task_meta(task_dir)
     roles = meta["roles"]
     ref = task_dir / "reference"
     initial = (ref / roles["initial"]).read_text()
@@ -84,7 +85,7 @@ def build_replay_generator(task_dir: str | Path, strategy: str = DEFAULT_STRATEG
     from falsify.generators.llm import LLMGenerator, RecordedTransport
 
     task_dir = Path(task_dir)
-    meta = _meta(task_dir)
+    meta = task_meta(task_dir)
     roles = meta["roles"]
     ref = task_dir / "reference"
 
@@ -97,14 +98,14 @@ def build_replay_generator(task_dir: str | Path, strategy: str = DEFAULT_STRATEG
 
 def role_source(task_dir: str | Path, role: str) -> str:
     task_dir = Path(task_dir)
-    return (task_dir / "reference" / _meta(task_dir)["roles"][role]).read_text()
+    return (task_dir / "reference" / task_meta(task_dir)["roles"][role]).read_text()
 
 
 def echidna_property(task_dir: str | Path) -> tuple[str, str] | None:
     """(property_source, property_contract) for a task's human-authored Echidna invariant,
     or None if the task defines none."""
     task_dir = Path(task_dir)
-    ec = _meta(task_dir).get("echidna")
+    ec = task_meta(task_dir).get("echidna")
     if not ec:
         return None
     src = (task_dir / "properties" / ec["property_file"]).read_text()

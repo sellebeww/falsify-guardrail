@@ -10,7 +10,6 @@ import re
 import subprocess
 
 from falsify import toolpaths
-from falsify.oracle.foundry import _solc_pin
 from falsify.types import ToolVersions
 
 
@@ -38,7 +37,7 @@ def capture() -> ToolVersions:
     forge = _run([toolpaths.forge_bin(), "--version"])
     slither = _run([toolpaths.slither_bin(), "--version"])
     # The default compiler pin; tasks may select another one, recorded in their artifacts.
-    solc = _run(["solc", "--version"], solc_version=_solc_pin(""))
+    solc = _run(["solc", "--version"], solc_version=toolpaths.DEFAULT_SOLC)
     echidna = _run([toolpaths.echidna_bin(), "--version"])
     return ToolVersions(
         python=platform.python_version(),

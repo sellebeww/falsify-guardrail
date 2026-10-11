@@ -65,11 +65,10 @@ class EchidnaChecker:
             return EchidnaResult(available=False)
         with tempfile.TemporaryDirectory(prefix="falsify-echidna-") as tmp:
             d = Path(tmp)
-            from falsify.oracle.foundry import _solc_pin
             from falsify.sources import write_sources
 
             write_sources(d, contract_name, contract_source, support_sources or {})
-            env = toolpaths.subprocess_env(solc_version=_solc_pin(solc_pragma))
+            env = toolpaths.subprocess_env(solc_version=toolpaths.solc_pin(solc_pragma))
             (d / f"{property_contract}.sol").write_text(property_source)
             (d / "echidna.yaml").write_text(_CONFIG.format(limit=self.test_limit, seed=self.seed))
             proc = subprocess.run(

@@ -114,7 +114,7 @@ def _run_echidna(task_dir: Path) -> int:
             continue
         res = checker.run(src, task.contract_name, prop_src, prop_contract, task.solc_pragma,
                           support_sources=task.support_sources)
-        expected = role == "good_fix" or "good_fix" not in benchmark._meta(task_dir)["roles"]
+        expected = role == "good_fix" or "good_fix" not in benchmark.task_meta(task_dir)["roles"]
         failed |= not res.properties or res.passed != expected
         if not res.properties:
             verdict = "ERROR (no property results)"
