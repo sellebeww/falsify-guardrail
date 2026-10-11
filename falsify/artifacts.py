@@ -13,6 +13,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from falsify.redact import sanitize
 from falsify.types import EvalRecord
 
 
@@ -28,8 +29,22 @@ def to_jsonable(obj: Any) -> Any:
     return obj
 
 
+#: Notes can quote compiler output, which echoes model-written source.
+NOTE_LIMIT = 2000
+
+
+def _sanitize_untrusted(d: dict) -> None:
+    """Sanitize every artifact field that carries text produced by untrusted execution."""
+    attempts = [d["initial_exploits"], *(a["exploit_results"] for a in d["repairs"])]
+    for results in attempts:
+        for result in results:
+            result["revert_reason"] = sanitize(result["revert_reason"])
+    d["notes"] = [sanitize(n, NOTE_LIMIT) for n in d["notes"]]
+
+
 def record_to_dict(record: EvalRecord) -> dict:
     d = to_jsonable(record)
+    _sanitize_untrusted(d)
     # Derived, human-facing summary so the artifact answers the RQs at a glance.
     d["summary"] = {
         "verdict": record.verdict.value,

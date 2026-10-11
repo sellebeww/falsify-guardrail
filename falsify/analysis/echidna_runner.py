@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from falsify import toolpaths
+from falsify.redact import sanitize
 
 # Fixed seed + single worker make every campaign reproducible (plan §9).
 _CONFIG = (
@@ -93,5 +94,5 @@ class EchidnaChecker:
             available=True,
             passed=bool(props) and all(props.values()),
             properties=props,
-            raw=out[-4000:],
+            raw=sanitize(out[-4000:], limit=4000),  # display only; properties parsed above
         )

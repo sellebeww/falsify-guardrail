@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from falsify.artifacts import NOTE_LIMIT
+from falsify.redact import sanitize
 from falsify.types import EvalRecord, FindingStatus, Severity
 
 _CAVEAT = "UNCONFIRMED != SECURE — the oracle's PoC library is partial (docs/limitations.md)."
@@ -49,7 +51,7 @@ def render_record(record: EvalRecord) -> str:
             )
     if record.notes:
         lines.append("Notes:")
-        lines += [f"  - {n}" for n in record.notes]
+        lines += [f"  - {sanitize(n, NOTE_LIMIT)}" for n in record.notes]
     lines.append(f"\n{_CAVEAT}")
     return "\n".join(lines)
 
