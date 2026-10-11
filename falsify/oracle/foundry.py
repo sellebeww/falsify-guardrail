@@ -9,7 +9,6 @@ builds and runs the relevant test files. A PoC "succeeds" iff its forge test PAS
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import subprocess
 import tempfile
@@ -35,6 +34,9 @@ libs = []
 solc = "{solc}"
 optimizer = true
 optimizer_runs = 200
+# The contract under test is untrusted: no shell commands, no filesystem access.
+ffi = false
+fs_permissions = []
 """
 
 BUILD_TIMEOUT = 180
@@ -73,9 +75,8 @@ class ForgeProject:
         self.contract_source = contract_source
         self.contract_name = contract_name
         pin = _solc_pin(solc_pragma)
-        installed = Path(os.environ.get("SOLC_SELECT_DIR", Path.home() / ".solc-select"))
-        installed = installed / "artifacts" / f"solc-{pin}" / f"solc-{pin}"
-        self.solc = str(installed) if installed.is_file() else pin
+        installed = toolpaths.solc_artifact(pin)
+        self.solc = str(installed) if installed else pin
         self.test_files = test_files or {}
         self.keep = keep
         self.support_sources = support_sources or {}

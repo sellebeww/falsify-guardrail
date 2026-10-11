@@ -50,8 +50,7 @@ class SlitherAnalyzer:
 
             write_sources(Path(tmp), artifact.contract_name, artifact.source,
                           artifact.support_sources)
-            env = toolpaths.subprocess_env()
-            env["SOLC_VERSION"] = _solc_pin(artifact.solc_pragma)
+            env = toolpaths.subprocess_env(solc_version=_solc_pin(artifact.solc_pragma))
             out = Path(tmp) / "slither.json"
             subprocess.run(
                 [toolpaths.slither_bin(), str(sol), "--json", str(out)],

@@ -10,10 +10,11 @@ import re
 import subprocess
 
 from falsify import toolpaths
+from falsify.oracle.foundry import _solc_pin
 from falsify.types import ToolVersions
 
 
-def _run(cmd: list[str]) -> str:
+def _run(cmd: list[str], solc_version: str | None = None) -> str:
     try:
         out = subprocess.run(
             cmd,
@@ -21,7 +22,7 @@ def _run(cmd: list[str]) -> str:
             text=True,
             timeout=30,
             check=False,
-            env=toolpaths.subprocess_env(),
+            env=toolpaths.subprocess_env(solc_version),
         )
         return (out.stdout + out.stderr).strip()
     except (OSError, subprocess.SubprocessError) as exc:  # tool missing / not runnable
@@ -36,7 +37,8 @@ def _first_semver(text: str) -> str:
 def capture() -> ToolVersions:
     forge = _run([toolpaths.forge_bin(), "--version"])
     slither = _run([toolpaths.slither_bin(), "--version"])
-    solc = _run([toolpaths.solc_bin(), "--version"])
+    # The default compiler pin; tasks may select another one, recorded in their artifacts.
+    solc = _run(["solc", "--version"], solc_version=_solc_pin(""))
     echidna = _run([toolpaths.echidna_bin(), "--version"])
     return ToolVersions(
         python=platform.python_version(),
