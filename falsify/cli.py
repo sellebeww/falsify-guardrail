@@ -32,19 +32,21 @@ _DEFAULT_TASK = _REPO_ROOT / "benchmark" / "tasks" / "reentrancy" / "task_001"
 
 
 def _run_task(task_dir: Path, generator_kind: str, out: Path | None,
-              models_path=None, model_name=None) -> int:
+              models_path=None, model_name=None, record=None, replay=None) -> int:
     task = benchmark.load_task(task_dir)
 
     if generator_kind == "live":
         from falsify.generators.http import build_model, load_models
+        from falsify.generators.transcript import TranscriptStore
 
         if models_path is None:
             raise ValueError("--models is required for live generation")
-        configs = load_models(models_path)
+        configs = load_models(models_path, check_credentials=replay is None)
         selected = [c for c in configs if c.name == model_name] if model_name else configs
         if len(selected) != 1:
             raise ValueError("choose exactly one model using --model")
-        generator = build_model(selected[0])
+        generator = build_model(selected[0], record=record,
+                                replay=TranscriptStore(replay) if replay else None)
     elif generator_kind == "replay":
         generator = benchmark.build_replay_generator(task_dir)
     else:
@@ -74,7 +76,7 @@ def _run_task(task_dir: Path, generator_kind: str, out: Path | None,
 
 
 def _run_bench(tasks_root: Path, out: Path | None, models_path=None,
-               repetitions=1, max_iterations=5) -> int:
+               repetitions=1, max_iterations=5, record=None, replay=None) -> int:
     print(f"Running Falsify benchmark over {tasks_root} ...\n")
     out = out or (
         _REPO_ROOT
@@ -83,9 +85,11 @@ def _run_bench(tasks_root: Path, out: Path | None, models_path=None,
     )
     from falsify.generators.http import load_models
 
+    models = load_models(models_path, check_credentials=replay is None) if models_path else None
     result = evaluator.run_benchmark(
-        tasks_root, models=load_models(models_path) if models_path else None,
-        repetitions=repetitions, config=LoopConfig(max_iterations=max_iterations), checkpoint=out,
+        tasks_root, models=models, repetitions=repetitions,
+        config=LoopConfig(max_iterations=max_iterations), checkpoint=out,
+        record_path=record, replay_path=replay,
     )
     write_benchmark(result, out)
     print(render_benchmark(result))
@@ -176,6 +180,14 @@ def _repo_relative(path: Path) -> str:
         return path.as_posix()
 
 
+def _transcript_args(parser: argparse.ArgumentParser) -> None:
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--record", type=Path,
+                       help="append live model exchanges to this JSONL transcript")
+    group.add_argument("--replay", type=Path,
+                       help="replay a recorded transcript offline (no network or credentials)")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="falsify", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -192,6 +204,7 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--out", type=Path, default=None)
     run.add_argument("--models", type=Path)
     run.add_argument("--model")
+    _transcript_args(run)
 
     bench = sub.add_parser("bench", help="run all strategies across all tasks (benchmark mode)")
     bench.add_argument("--tasks", type=Path, default=_REPO_ROOT / "benchmark" / "tasks")
@@ -199,6 +212,7 @@ def main(argv: list[str] | None = None) -> int:
     bench.add_argument("--models", type=Path, help="JSON live model configurations")
     bench.add_argument("--repetitions", type=int, default=1)
     bench.add_argument("--max-iterations", type=int, default=5)
+    _transcript_args(bench)
 
     ech = sub.add_parser("echidna", help="run a task's Echidna invariant (independent oracle)")
     ech.add_argument(
@@ -230,9 +244,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "demo":
         return _run_task(_DEFAULT_TASK, "fixture", None)
     if args.cmd == "run":
-        return _run_task(args.task, args.generator, args.out, args.models, args.model)
+        return _run_task(args.task, args.generator, args.out, args.models, args.model,
+                         args.record, args.replay)
     if args.cmd == "bench":
-        return _run_bench(args.tasks, args.out, args.models, args.repetitions, args.max_iterations)
+        return _run_bench(args.tasks, args.out, args.models, args.repetitions,
+                          args.max_iterations, args.record, args.replay)
     if args.cmd == "validate-task":
         tasks = args.task + (benchmark.discover_tasks(_REPO_ROOT / "benchmark/tasks")
                              if args.all else [])

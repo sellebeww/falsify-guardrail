@@ -99,8 +99,9 @@ falsify run --generator live --models examples/models.json --model local-model-a
 ```
 
 Use `api_key_env` to name an environment variable for a remote credential; never put a key in
-configuration files. Requests have timeout/output-token limits and no automatic retries.
-Each completed task/model/repetition is checkpointed. No external model inference has been
+configuration files. Requests have timeout/output-token limits; retries are opt-in per model
+(`max_retries`). Add `--record transcript.jsonl` to keep every exchange and `--replay` it later
+offline, without credentials. Each completed task/model/repetition is checkpointed. No external model inference has been
 verified in this change: the HTTP path has been tested against a local mock, and model
 credentials/endpoints are still needed for a real campaign. See [benchmark protocol](docs/benchmarking.md).
 

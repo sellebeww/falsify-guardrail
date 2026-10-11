@@ -139,14 +139,22 @@ def run_benchmark(
     models=None,
     repetitions: int = 1,
     checkpoint: Path | None = None,
+    record_path: Path | None = None,
+    replay_path: Path | None = None,
 ) -> BenchmarkResult:
+    """Run every task against each fixture strategy, or each live model when `models` is
+    given. Live runs can record their exchanges to `record_path` or replay `replay_path`."""
     from dataclasses import asdict
 
     from falsify.artifacts import write_benchmark
     from falsify.generators.http import build_model
+    from falsify.generators.transcript import TranscriptStore
 
     if repetitions < 1:
         raise ValueError("repetitions must be positive")
+    if (record_path or replay_path) and not models:
+        raise ValueError("record/replay apply to live models only")
+    store = TranscriptStore(replay_path) if replay_path else None
     strategies = strategies or list(benchmark.STRATEGIES)
     config = config or LoopConfig()
     vers = versions.capture()
@@ -159,7 +167,7 @@ def run_benchmark(
         task = benchmark.load_task(task_dir)
         for entry in models or strategies:
             for repetition in range(1, repetitions + 1):
-                generator = (build_model(entry) if models else
+                generator = (build_model(entry, record=record_path, replay=store) if models else
                              benchmark.build_generator(task_dir, entry))
                 orch = Orchestrator(
                     generator=generator, analyzer=SlitherAnalyzer(), oracle=FoundryOracle(),

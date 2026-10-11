@@ -14,15 +14,20 @@ def server():
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):
             self.server.requests.append(json.loads(self.rfile.read(int(self.headers['Content-Length']))))
-            self.send_response(self.server.status)
+            status, reply, headers = (self.server.queue.pop(0) if self.server.queue
+                                      else (self.server.status, self.server.reply, {}))
+            self.send_response(status)
+            for name, value in headers.items():
+                self.send_header(name, value)
             self.end_headers()
-            self.wfile.write(json.dumps(self.server.reply).encode())
+            self.wfile.write(json.dumps(reply).encode())
 
         def log_message(self, *args):
             pass
 
     srv = HTTPServer(('127.0.0.1', 0), Handler)
     srv.requests = []
+    srv.queue = []
     srv.status = 200
     srv.reply = {'choices': [{'message': {'content': '```solidity\ncontract A {}\n```'}}],
                  'usage': {'total_tokens': 20}}
@@ -98,3 +103,44 @@ def test_live_benchmark_uses_each_model_on_identical_tasks_and_checkpoints(serve
     assert saved['runs'][0]['record']['sources']
     assert saved['runs'][0]['record']['model_calls'][0]['usage']['total_tokens'] == 20
     assert result.pareto_by_category() == {}
+
+
+def test_retries_are_off_by_default(server):
+    server.queue = [(503, {}, {})]
+    with pytest.raises(RuntimeError, match='503'):
+        HTTPTransport(config(server))('system', 'prompt')
+    assert len(server.requests) == 1
+
+
+def test_opt_in_retries_honor_retry_after_then_succeed(server):
+    server.queue = [(429, {}, {'Retry-After': '7'}), (503, {}, {})]
+    sleeps = []
+    cfg = ModelConfig('local', 'test-model', config(server).endpoint, max_retries=2,
+                      retry_backoff=0.5)
+    transport = HTTPTransport(cfg, sleep=sleeps.append)
+    assert transport('system', 'prompt') == '```solidity\ncontract A {}\n```'
+    assert sleeps == [7.0, 1.0]  # Retry-After, then exponential backoff for attempt 2
+    assert transport.calls[0]['attempts'] == 3
+
+
+def test_client_errors_are_never_retried(server):
+    server.queue = [(400, {}, {})]
+    cfg = ModelConfig('local', 'test-model', config(server).endpoint, max_retries=3)
+    with pytest.raises(RuntimeError, match='400'):
+        HTTPTransport(cfg, sleep=lambda s: None)('system', 'prompt')
+    assert len(server.requests) == 1
+
+
+def test_retry_after_is_capped(server):
+    server.queue = [(429, {}, {'Retry-After': '86400'})]
+    sleeps = []
+    cfg = ModelConfig('local', 'test-model', config(server).endpoint, max_retries=1)
+    HTTPTransport(cfg, sleep=sleeps.append)('system', 'prompt')
+    assert sleeps == [60.0]
+
+
+@pytest.mark.parametrize('field,value', [('max_retries', 11), ('max_retries', -1),
+                                         ('retry_backoff', 0)])
+def test_retry_settings_are_bounded(field, value):
+    with pytest.raises(ValueError):
+        ModelConfig('m', 'm', 'http://localhost:1/chat', **{field: value})
