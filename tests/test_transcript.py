@@ -99,3 +99,23 @@ def test_corrupt_transcript_is_rejected(tmp_path):
 def test_record_and_replay_require_live_models(tmp_path):
     with pytest.raises(ValueError):
         evaluator.run_benchmark("benchmark/tasks", record_path=tmp_path / "t.jsonl")
+
+
+def test_parallel_replay_is_exact_per_run(server, tmp_path, offline_tools):  # noqa: F811
+    tasks = one_task(tmp_path)
+    server.queue = [(200, reply(n), {}) for n in range(4)]
+    models = [ModelConfig("first", "model-a", config(server).endpoint)]
+    transcript = tmp_path / "transcript.jsonl"
+    live = evaluator.run_benchmark(tasks, models=models, repetitions=4, record_path=transcript)
+    replayed = evaluator.run_benchmark(tasks, models=models, repetitions=4,
+                                       replay_path=transcript, jobs=4)
+    assert [r.repetition for r in replayed.runs] == [1, 2, 3, 4]
+    assert [r.record.sources for r in replayed.runs] == [r.record.sources for r in live.runs]
+
+
+def test_parallel_fixture_benchmark_matches_serial_order(offline_tools):
+    serial = evaluator.run_benchmark("benchmark/tasks")
+    parallel = evaluator.run_benchmark("benchmark/tasks", jobs=4)
+    key = [(r.strategy, r.task_id, r.repetition, r.record.verdict) for r in serial.runs]
+    assert [(r.strategy, r.task_id, r.repetition, r.record.verdict)
+            for r in parallel.runs] == key

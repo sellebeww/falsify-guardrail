@@ -46,7 +46,8 @@ def _run_task(task_dir: Path, generator_kind: str, out: Path | None,
         if len(selected) != 1:
             raise ValueError("choose exactly one model using --model")
         generator = build_model(selected[0], record=record,
-                                replay=TranscriptStore(replay) if replay else None)
+                                replay=TranscriptStore(replay) if replay else None,
+                                slot=f"{task.id}#1")
     elif generator_kind == "replay":
         generator = benchmark.build_replay_generator(task_dir)
     else:
@@ -76,7 +77,7 @@ def _run_task(task_dir: Path, generator_kind: str, out: Path | None,
 
 
 def _run_bench(tasks_root: Path, out: Path | None, models_path=None,
-               repetitions=1, max_iterations=5, record=None, replay=None) -> int:
+               repetitions=1, max_iterations=5, record=None, replay=None, jobs=1) -> int:
     print(f"Running Falsify benchmark over {tasks_root} ...\n")
     out = out or (
         _REPO_ROOT
@@ -89,7 +90,7 @@ def _run_bench(tasks_root: Path, out: Path | None, models_path=None,
     result = evaluator.run_benchmark(
         tasks_root, models=models, repetitions=repetitions,
         config=LoopConfig(max_iterations=max_iterations), checkpoint=out,
-        record_path=record, replay_path=replay,
+        record_path=record, replay_path=replay, jobs=jobs,
     )
     write_benchmark(result, out)
     print(render_benchmark(result))
@@ -212,6 +213,8 @@ def main(argv: list[str] | None = None) -> int:
     bench.add_argument("--models", type=Path, help="JSON live model configurations")
     bench.add_argument("--repetitions", type=int, default=1)
     bench.add_argument("--max-iterations", type=int, default=5)
+    bench.add_argument("--jobs", type=int, default=1,
+                       help="run independent task/model/repetition combinations in parallel")
     _transcript_args(bench)
 
     ech = sub.add_parser("echidna", help="run a task's Echidna invariant (independent oracle)")
@@ -248,7 +251,7 @@ def main(argv: list[str] | None = None) -> int:
                          args.record, args.replay)
     if args.cmd == "bench":
         return _run_bench(args.tasks, args.out, args.models, args.repetitions,
-                          args.max_iterations, args.record, args.replay)
+                          args.max_iterations, args.record, args.replay, args.jobs)
     if args.cmd == "validate-task":
         tasks = args.task + (benchmark.discover_tasks(_REPO_ROOT / "benchmark/tasks")
                              if args.all else [])

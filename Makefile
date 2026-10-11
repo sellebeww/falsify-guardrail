@@ -26,8 +26,10 @@ setup:
 demo:
 	$(PY) -m falsify.cli demo
 
+JOBS ?= 4
+
 bench:
-	$(PY) -m falsify.cli bench
+	$(PY) -m falsify.cli bench --jobs $(JOBS)
 
 run:
 	$(PY) -m falsify.cli run --task $(TASK) --generator $(GEN)

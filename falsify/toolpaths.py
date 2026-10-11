@@ -17,6 +17,7 @@ import os
 import re
 import shutil
 import tempfile
+import threading
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -87,6 +88,7 @@ SUBPROCESS_ENV_KEYS = frozenset({
 })
 
 _sandbox_home: Path | None = None
+_home_lock = threading.Lock()  # benchmark runs may execute in parallel threads
 
 
 def _home() -> Path:
@@ -95,10 +97,11 @@ def _home() -> Path:
     It hides host dotfiles and global tool configuration such as `~/.foundry/foundry.toml`.
     """
     global _sandbox_home
-    if _sandbox_home is None or not _sandbox_home.is_dir():
-        _sandbox_home = Path(tempfile.mkdtemp(prefix="falsify-home-"))
-        atexit.register(shutil.rmtree, _sandbox_home, True)
-    return _sandbox_home
+    with _home_lock:
+        if _sandbox_home is None or not _sandbox_home.is_dir():
+            _sandbox_home = Path(tempfile.mkdtemp(prefix="falsify-home-"))
+            atexit.register(shutil.rmtree, _sandbox_home, True)
+        return _sandbox_home
 
 
 def _pinned_solc_dir(version: str) -> Path | None:
@@ -110,7 +113,10 @@ def _pinned_solc_dir(version: str) -> Path | None:
     link = link_dir / "solc"
     if not link.exists():
         link_dir.mkdir(parents=True, exist_ok=True)
-        link.symlink_to(artifact)
+        try:
+            link.symlink_to(artifact)
+        except FileExistsError:  # created concurrently by another run
+            pass
     return link_dir
 
 

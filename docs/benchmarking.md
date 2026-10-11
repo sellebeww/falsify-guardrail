@@ -1,7 +1,10 @@
 # Benchmark protocol
 
 `falsify bench` defaults to fixtures. `--models FILE` selects real HTTP generation for every
-configured model on every discovered task. `--repetitions N` creates fresh generators for
+configured model on every discovered task. `--jobs N` runs independent task/model/repetition
+combinations in parallel; runs are reported in the same order as a serial campaign, and
+replays stay exact because transcripts are keyed by task and repetition. Mind provider rate
+limits when parallelizing live requests. `--repetitions N` creates fresh generators for
 independent runs; `--max-iterations N` bounds repair calls. Maximum requests are
 `tasks × models × repetitions × (1 + max_iterations) × (1 + max_retries)`; early stopping
 can reduce this.
@@ -24,7 +27,7 @@ and truncated output are never retried. Each model call records its number of at
 `--record transcript.jsonl` appends every model exchange of a live `bench` or `run` to a
 JSON Lines transcript. `--replay transcript.jsonl` re-runs the campaign from it with no
 network access and no credentials, for example after a change to the oracle, a task harness
-or the scoring. Entries are keyed by model name and the exact prompts. Repair prompts embed
+or the scoring. Entries are keyed by model name, task, repetition and the exact prompts. Repair prompts embed
 the previous response, so a replay follows the recorded conversation. Responses for an
 identical prompt are consumed in recording order, so each repetition replays its own
 responses. If a prompt has no remaining recorded response, because the specification or

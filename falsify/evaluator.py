@@ -141,17 +141,23 @@ def run_benchmark(
     checkpoint: Path | None = None,
     record_path: Path | None = None,
     replay_path: Path | None = None,
+    jobs: int = 1,
 ) -> BenchmarkResult:
     """Run every task against each fixture strategy, or each live model when `models` is
-    given. Live runs can record their exchanges to `record_path` or replay `replay_path`."""
+    given. Live runs can record their exchanges to `record_path` or replay `replay_path`.
+
+    `jobs` runs independent task/generator/repetition combinations in parallel threads; the
+    work is subprocess- and network-bound. Runs are reported in the same order as serially.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     from dataclasses import asdict
 
     from falsify.artifacts import write_benchmark
     from falsify.generators.http import build_model
     from falsify.generators.transcript import TranscriptStore
 
-    if repetitions < 1:
-        raise ValueError("repetitions must be positive")
+    if repetitions < 1 or jobs < 1:
+        raise ValueError("repetitions and jobs must be positive")
     if (record_path or replay_path) and not models:
         raise ValueError("record/replay apply to live models only")
     store = TranscriptStore(replay_path) if replay_path else None
@@ -163,20 +169,30 @@ def run_benchmark(
     task_dirs = benchmark.discover_tasks(tasks_root)
     if not task_dirs:
         raise ValueError("no benchmark tasks found")
-    for task_dir in task_dirs:
-        task = benchmark.load_task(task_dir)
-        for entry in models or strategies:
-            for repetition in range(1, repetitions + 1):
-                generator = (build_model(entry, record=record_path, replay=store) if models else
-                             benchmark.build_generator(task_dir, entry))
-                orch = Orchestrator(
-                    generator=generator, analyzer=SlitherAnalyzer(), oracle=FoundryOracle(),
-                    compiler=FoundryCompiler(), tester=FoundryFunctionalTester(),
-                    config=config, versions=vers,
-                )
-                record = orch.run(task)
-                result.runs.append(RunResult(entry.name if models else entry, task.id,
-                                             task.category, record, repetition))
-                if checkpoint:
-                    write_benchmark(result, checkpoint)
+    tasks = [(d, benchmark.load_task(d)) for d in task_dirs]
+    work = [(task_dir, task, entry, repetition)
+            for task_dir, task in tasks
+            for entry in models or strategies
+            for repetition in range(1, repetitions + 1)]
+
+    def execute(task_dir, task, entry, repetition) -> RunResult:
+        generator = (build_model(entry, record=record_path, replay=store,
+                                 slot=f"{task.id}#{repetition}") if models else
+                     benchmark.build_generator(task_dir, entry))
+        orch = Orchestrator(
+            generator=generator, analyzer=SlitherAnalyzer(), oracle=FoundryOracle(),
+            compiler=FoundryCompiler(), tester=FoundryFunctionalTester(),
+            config=config, versions=vers,
+        )
+        return RunResult(entry.name if models else entry, task.id, task.category,
+                         orch.run(task), repetition)
+
+    done: dict[int, RunResult] = {}
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        futures = {pool.submit(execute, *item): i for i, item in enumerate(work)}
+        for future in as_completed(futures):
+            done[futures[future]] = future.result()
+            result.runs = [done[i] for i in sorted(done)]
+            if checkpoint:
+                write_benchmark(result, checkpoint)
     return result

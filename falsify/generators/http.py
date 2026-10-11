@@ -123,13 +123,17 @@ def load_models(path: Path, check_credentials: bool = True) -> list[ModelConfig]
 
 
 def build_model(config: ModelConfig, record: Path | None = None,
-                replay: TranscriptStore | None = None) -> LLMGenerator:
-    """A live generator, optionally recording its exchanges or replaying a recording."""
+                replay: TranscriptStore | None = None, slot: str = "") -> LLMGenerator:
+    """A live generator, optionally recording its exchanges or replaying a recording.
+
+    `slot` identifies the run (task and repetition) within a transcript.
+    """
     if record and replay:
         raise ValueError("record and replay are mutually exclusive")
     if replay is not None:
-        return LLMGenerator(ReplayTransport(replay, config.name), name=f"replay:{config.name}")
+        return LLMGenerator(ReplayTransport(replay, config.name, slot),
+                            name=f"replay:{config.name}")
     transport = HTTPTransport(config)
     if record is not None:
-        transport = RecordingTransport(transport, record, config.name)
+        transport = RecordingTransport(transport, record, config.name, slot)
     return LLMGenerator(transport, name=f"live:{config.name}")

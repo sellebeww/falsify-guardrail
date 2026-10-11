@@ -16,7 +16,7 @@ observations, not statistical findings or evidence of production readiness.
 ```bash
 make setup       # Foundry, Slither, solc 0.8.24 + 0.8.20, optional Echidna
 make demo        # deterministic fixture: vulnerable -> false fix -> real fix
-make bench       # three scripted strategies across all eight tasks
+make bench       # three scripted strategies across all eight tasks (add --jobs N to parallelize)
 make echidna     # independent property campaigns for all eight tasks
 make validate    # every exploit fires on exploitable controls and never on safe ones
 make test        # unit tests, including a local HTTP mock server; no paid API
