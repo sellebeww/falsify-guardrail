@@ -30,6 +30,29 @@ attack fails. Functional tests use ordinary pass-on-correct-behavior assertions.
 unbuildable suites block. Candidate source must keep the harness-compatible interface;
 changing it to make the exploit fail compilation is never an accepted repair.
 
+### Controls: proving the exploit can fire
+
+A failing exploit only means something if the exploit could have succeeded. A harness with a
+broken `setUp`, a stale interface or a wrong assertion would report every candidate as "not
+exploited". Declare controls, sources whose outcome is known, to rule that out:
+
+```json
+"controls": {
+  "exploitable": ["controls/Vault_vulnerable.sol"],
+  "safe": ["controls/Vault_fixed.sol"]
+}
+```
+
+Paths are relative to the task directory. `falsify validate-task --task DIR` requires:
+
+- every exploit succeeds on at least one exploitable control,
+- no exploit succeeds on a safe control,
+- the functional suite passes on every control.
+
+Without a `controls` block, fixture roles are used: `initial` and `bad_fix` are exploitable,
+`good_fix` is safe. A task whose initial contract is safe must declare `controls`
+explicitly. Run validation whenever the harness changes; CI runs it for every bundled task.
+
 `--source-root` replaces task support sources with the `.sol` files under the provided root,
 excluding the entry. Relative paths are preserved and traversal/collisions rejected. Put the
 entry directly under that directory. Dependency packages and remappings are not resolved.

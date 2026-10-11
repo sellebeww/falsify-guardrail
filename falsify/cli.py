@@ -130,6 +130,15 @@ def _run_echidna(task_dir: Path) -> int:
     return 1 if failed else 0
 
 
+def _validate_task(task_dir: Path) -> int:
+    from falsify import harness
+
+    task = benchmark.load_task(task_dir)
+    report = harness.validate(task_dir, task, FoundryOracle(), FoundryFunctionalTester())
+    print(harness.render(report) + "\n")
+    return 0 if report.ok else 1
+
+
 def _check(task_dir: Path, source: Path, source_root: Path | None, out: Path) -> int:
     from falsify.generators.fixture import FixtureGenerator
 
@@ -185,6 +194,12 @@ def main(argv: list[str] | None = None) -> int:
 
     ech.add_argument("--all", action="store_true", help="cross-check every bundled task")
 
+    val = sub.add_parser("validate-task",
+                         help="check that a task's exploits fire on known-exploitable controls "
+                              "and stay silent on known-safe ones")
+    val.add_argument("--task", type=Path, action="append", default=[])
+    val.add_argument("--all", action="store_true", help="validate every bundled task")
+
     check = sub.add_parser("check", help="vet an existing contract against a trusted task harness")
     check.add_argument("--task", type=Path, required=True)
     check.add_argument("--source", type=Path, required=True)
@@ -198,6 +213,12 @@ def main(argv: list[str] | None = None) -> int:
         return _run_task(args.task, args.generator, args.out, args.models, args.model)
     if args.cmd == "bench":
         return _run_bench(args.tasks, args.out, args.models, args.repetitions, args.max_iterations)
+    if args.cmd == "validate-task":
+        tasks = args.task + (benchmark.discover_tasks(_REPO_ROOT / "benchmark/tasks")
+                             if args.all else [])
+        if not tasks:
+            parser.error("validate-task needs --task DIR or --all")
+        return max(_validate_task(t) for t in tasks)
     if args.cmd == "check":
         return _check(args.task, args.source, args.source_root, args.out)
     if args.cmd == "echidna":

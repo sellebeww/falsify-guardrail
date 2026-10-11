@@ -18,6 +18,7 @@ make setup       # Foundry, Slither, solc 0.8.24 + 0.8.20, optional Echidna
 make demo        # deterministic fixture: vulnerable -> false fix -> real fix
 make bench       # three scripted strategies across all eight tasks
 make echidna     # independent property campaigns for all eight tasks
+make validate    # every exploit fires on exploitable controls and never on safe ones
 make test        # unit tests, including a local HTTP mock server; no paid API
 make test-int    # real toolchain integration tests
 make lint
@@ -32,7 +33,9 @@ gas values depend on compiler, EVM and test suite.
 
 Provide a **trusted task harness** describing the contract interface, functional expectations,
 and exploit scenarios. Falsify does not automatically invent meaningful tests for arbitrary
-contracts.
+contracts. Declare known-exploitable and known-safe **controls** and run
+`falsify validate-task --task DIR`, so a broken exploit cannot pass every candidate silently
+([controls](docs/guardrail.md#controls-proving-the-exploit-can-fire)).
 
 ```bash
 falsify check --task path/to/trusted-task --source contracts/Vault.sol \

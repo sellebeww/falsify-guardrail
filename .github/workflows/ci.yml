@@ -50,8 +50,9 @@ jobs:
       - name: Integration tests (Foundry + Slither + Echidna)
         run: ./.venv/bin/python -m pytest -m integration
 
-      - name: CLI smoke (demo, bench, echidna)
+      - name: CLI smoke (validate-task, demo, bench, echidna)
         run: |
+          ./.venv/bin/python -m falsify.cli validate-task --all
           ./.venv/bin/python -m falsify.cli demo
           ./.venv/bin/python -m falsify.cli bench
           ./.venv/bin/python -m falsify.cli echidna

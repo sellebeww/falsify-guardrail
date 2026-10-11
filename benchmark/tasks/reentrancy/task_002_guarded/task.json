@@ -10,5 +10,13 @@
   "echidna": {
     "property_file": "EchidnaVault.sol",
     "property_contract": "EchidnaVault"
+  },
+  "controls": {
+    "exploitable": [
+      "reference/Vault_unguarded.sol"
+    ],
+    "safe": [
+      "reference/Vault_guarded.sol"
+    ]
   }
 }

@@ -5,7 +5,7 @@ export PATH := $(HOME)/.foundry/bin:$(CURDIR)/.venv/bin:$(PATH)
 TASK ?= benchmark/tasks/reentrancy/task_001
 GEN  ?= fixture
 
-.PHONY: help setup demo bench run echidna test test-int lint versions clean
+.PHONY: help setup demo bench run echidna validate test test-int lint versions clean
 
 help:
 	@echo "make setup     - install toolchain (venv, Foundry, solc, Slither, Echidna) + versions.lock"
@@ -13,6 +13,7 @@ help:
 	@echo "make bench     - run all strategies across all tasks -> RQ confusion matrix + Pareto"
 	@echo "make run       - run a task: make run TASK=<dir> GEN=fixture|replay"
 	@echo "make echidna   - run a task's Echidna invariant (independent property oracle)"
+	@echo "make validate  - check every task's exploits fire on exploitable controls only"
 	@echo "make test      - fast offline unit tests"
 	@echo "make test-int  - integration tests (real Foundry + Slither + Echidna)"
 	@echo "make lint      - ruff"
@@ -33,6 +34,9 @@ run:
 
 echidna:
 	$(PY) -m falsify.cli echidna --all
+
+validate:
+	$(PY) -m falsify.cli validate-task --all
 
 test:
 	$(PY) -m pytest -q -m "not integration"
