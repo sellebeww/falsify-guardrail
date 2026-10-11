@@ -139,24 +139,14 @@ def _validate_task(task_dir: Path) -> int:
     return 0 if report.ok else 1
 
 
-def _check(task_dir: Path, source: Path, source_root: Path | None, out: Path) -> int:
-    from falsify.generators.fixture import FixtureGenerator
+def _check(task_dir: Path, source: Path, source_root: Path | None, out: Path,
+           strict: bool = False) -> int:
+    from falsify import guardrail
 
-    task = benchmark.load_task(task_dir)
-    if source_root:
-        source_root = source_root.resolve()
-        if source.resolve().parent != source_root:
-            raise ValueError("entry source must be directly inside --source-root")
-        task.support_sources = {
-            p.relative_to(source_root).as_posix(): p.read_text()
-            for p in source_root.rglob("*.sol") if p.resolve() != source.resolve()
-        }
-    generator = FixtureGenerator(source.read_text(), [], task.contract_name, name="existing-source")
-    record = Orchestrator(
-        generator, SlitherAnalyzer(), FoundryOracle(), FoundryCompiler(),
-        FoundryFunctionalTester(), config=LoopConfig(max_iterations=0),
-        versions=versions.capture(),
-    ).run(task)
+    tools = guardrail.Tools(SlitherAnalyzer(), FoundryOracle(), FoundryCompiler(),
+                            FoundryFunctionalTester(), versions.capture())
+    support = guardrail.support_from_root(source, source_root) if source_root else None
+    record = guardrail.check(task_dir, source.read_text(), tools, support, strict=strict)
     write_record(record, out)
     print(render_record(record))
     print(f"Artifact: {out}")
@@ -205,6 +195,8 @@ def main(argv: list[str] | None = None) -> int:
     check.add_argument("--source", type=Path, required=True)
     check.add_argument("--source-root", type=Path)
     check.add_argument("--out", type=Path, default=Path("results/guardrail.json"))
+    check.add_argument("--strict", action="store_true",
+                       help="also block unconfirmed detector findings and unverified harnesses")
 
     args = parser.parse_args(argv)
     if args.cmd == "demo":
@@ -220,7 +212,7 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("validate-task needs --task DIR or --all")
         return max(_validate_task(t) for t in tasks)
     if args.cmd == "check":
-        return _check(args.task, args.source, args.source_root, args.out)
+        return _check(args.task, args.source, args.source_root, args.out, args.strict)
     if args.cmd == "echidna":
         if args.all:
             codes = [_run_echidna(t) for t in benchmark.discover_tasks(_REPO_ROOT / "benchmark/tasks")]

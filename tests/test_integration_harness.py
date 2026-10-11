@@ -43,3 +43,18 @@ def test_dead_exploit_is_caught(tmp_path):
     report = harness.validate(task_dir, benchmark.load_task(task_dir), FoundryOracle())
     assert not report.ok and not report.verified
     assert any("known-exploitable" in p for p in report.all_problems())
+
+
+def test_check_blocks_when_the_harness_cannot_fire(tmp_path):
+    """Without the liveness preflight, the vulnerable vault passed as an unconfirmed gap."""
+    import json
+
+    from falsify.cli import main
+
+    task_dir = broken_copy(tmp_path)
+    out = tmp_path / "result.json"
+    code = main(["check", "--task", str(task_dir), "--source",
+                 str(task_dir / "reference" / "Vault_vulnerable.sol"), "--out", str(out)])
+    data = json.loads(out.read_text())
+    assert code == 1 and data["verdict"] == "tool_error"
+    assert any("harness is not live" in n for n in data["notes"])

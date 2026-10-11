@@ -53,6 +53,23 @@ Without a `controls` block, fixture roles are used: `initial` and `bad_fix` are 
 `good_fix` is safe. A task whose initial contract is safe must declare `controls`
 explicitly. Run validation whenever the harness changes; CI runs it for every bundled task.
 
+`falsify check` runs the exploits on the exploitable controls before it evaluates the
+candidate. If any exploit fails to fire there, the result is `TOOL_ERROR` and the gate
+blocks: a dead harness can no longer pass every candidate. A task without an exploitable
+control still runs, and the artifact notes that liveness is unverified.
+
+### Strict mode
+
+By default `ORACLE_GAP` passes with a caveat: a detector flagged something that no supplied
+exploit confirmed. `falsify check --strict` blocks in two more cases:
+
+- detector findings remain unconfirmed (`ORACLE_GAP`),
+- the task declares no exploitable control, so exploit liveness is unverified.
+
+The verdict is unchanged; `gate_pass` becomes false and a `strict:` note explains why.
+Use strict mode when unexplained detector findings should be reviewed by a person before
+merging.
+
 `--source-root` replaces task support sources with the `.sol` files under the provided root,
 excluding the entry. Relative paths are preserved and traversal/collisions rejected. Put the
 entry directly under that directory. Dependency packages and remappings are not resolved.

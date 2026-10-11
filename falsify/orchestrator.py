@@ -41,6 +41,16 @@ def _succeeding(results: list[ExploitResult]) -> set[str]:
     return {r.poc_id for r in results if r.success}
 
 
+def tool_error_record(task: TaskSpec, model: str, versions: ToolVersions, note: str) -> EvalRecord:
+    """A blocking record for an evaluation that could not produce trustworthy evidence."""
+    now = datetime.now(UTC).isoformat()
+    return EvalRecord(
+        task_id=task.id, category=task.category, model=model, versions=versions,
+        verdict=LoopVerdict.TOOL_ERROR, gate_pass=False, solc_pragma=task.solc_pragma,
+        notes=[note], timestamps={"started": now, "ended": now},
+    )
+
+
 class Orchestrator:
     def __init__(
         self,
@@ -68,13 +78,13 @@ class Orchestrator:
             record.model_calls = list(getattr(self.generator, "model_calls", []))
             return record
         except (OSError, RuntimeError, ValueError, subprocess.TimeoutExpired) as exc:
-            record = self._record or EvalRecord(
-                task_id=task.id, category=task.category, model=self.generator.name,
-                versions=self.versions, verdict=LoopVerdict.TOOL_ERROR, gate_pass=False,
-                solc_pragma=task.solc_pragma,
-            )
-            record.verdict = LoopVerdict.TOOL_ERROR
-            record.notes.append(f"evaluation failed: {type(exc).__name__}: {exc}")
+            note = f"evaluation failed: {type(exc).__name__}: {exc}"
+            record = self._record
+            if record is None:
+                record = tool_error_record(task, self.generator.name, self.versions, note)
+            else:
+                record.verdict = LoopVerdict.TOOL_ERROR
+                record.notes.append(note)
             record.model_calls = list(getattr(self.generator, "model_calls", []))
             return self._finalize(record)
 

@@ -67,3 +67,8 @@ RQ2 (unconfirmed candidates; not proven false positives) is not a fate: it is me
 | `COMPILE_FAIL` | repairs failed to compile `m` times in a row (or initial did) | BLOCK |
 
 No terminal state silently upgrades an unconfirmed result to "secure".
+
+In guardrail mode (`falsify check`), exploits must first fire on the task's
+known-exploitable controls; otherwise the result is `TOOL_ERROR`. `--strict` additionally
+blocks `ORACLE_GAP` and tasks without an exploitable control. See
+[guardrail.md](guardrail.md#controls-proving-the-exploit-can-fire).
