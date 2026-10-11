@@ -37,6 +37,10 @@ optimizer_runs = 200
 # The contract under test is untrusted: no shell commands, no filesystem access.
 ffi = false
 fs_permissions = []
+
+# Fuzz and invariant tests in a harness use a fixed seed, so a verdict is reproducible.
+[profile.default.fuzz]
+seed = "0x1337"
 """
 
 BUILD_TIMEOUT = 180
