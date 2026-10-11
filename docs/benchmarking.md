@@ -62,4 +62,4 @@ and hypotheses, hold out private tasks, budget repeated model runs, manually adj
 unconfirmed findings, and use an appropriate uncertainty analysis. None of that is implied
 by the bundled eight-task demonstration.
 
-Transport reference: [vLLM compatible server documentation](https://docs.vllm.ai/en/latest/serving/openai_compatible_server/).
+Transport reference: [vLLM serving documentation](https://docs.vllm.ai/en/latest/serving/).
