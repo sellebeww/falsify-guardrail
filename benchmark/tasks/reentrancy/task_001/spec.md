@@ -13,4 +13,4 @@ Requirements:
 
 > This `spec.md` is the ONLY artifact shown to the model under test. The functional
 > tests, invariants, and exploit PoC in the sibling directories are human-owned and are
-> never provided to the generator or the repair step (plan §4).
+> never provided to the generator or the repair step (see docs/threat-model.md).

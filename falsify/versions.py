@@ -1,4 +1,4 @@
-"""Capture tool versions into a ToolVersions record (plan §5, §9).
+"""Capture tool versions into a ToolVersions record.
 
 Recorded into every artifact so a run is reproducible and diffable.
 """

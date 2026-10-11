@@ -1,4 +1,4 @@
-"""Serialize EvalRecord (and friends) to a stable JSON artifact (plan §9).
+"""Serialize EvalRecord (and friends) to a stable JSON artifact.
 
 Deterministic key order; enums by value; dataclasses expanded recursively so the
 whole run — findings, exploit results, repair attempts, verdict, gas, tool versions —

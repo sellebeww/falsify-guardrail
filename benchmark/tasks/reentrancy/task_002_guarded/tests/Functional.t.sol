@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// HUMAN-OWNED functional suite. Never shown to the model under test (plan §4).
+// HUMAN-OWNED functional suite. Never shown to the model under test (see docs/threat-model.md).
 // No forge-std dependency: a minimal cheatcode interface is declared inline, and
 // checks use require() so a passing test simply does not revert.
 

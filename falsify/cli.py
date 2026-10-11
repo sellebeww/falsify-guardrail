@@ -1,4 +1,4 @@
-"""Falsify CLI (plan §8 MVP, §dual-mode).
+"""Falsify CLI.
 
   falsify demo                 run the bundled reentrancy task offline (fixture generator)
   falsify run --task DIR       run any task; --generator fixture|replay

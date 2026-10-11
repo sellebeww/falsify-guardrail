@@ -12,4 +12,4 @@ Requirements:
   `kill()` must revert.
 
 > This `spec.md` is the ONLY artifact shown to the model under test. The functional tests
-> and exploit PoC in the sibling directories are human-owned (plan §4).
+> and exploit PoC in the sibling directories are human-owned (see docs/threat-model.md).

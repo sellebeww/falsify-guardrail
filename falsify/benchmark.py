@@ -1,4 +1,4 @@
-"""Load on-disk benchmark tasks and build repair strategies (plan §7).
+"""Load on-disk benchmark tasks and build repair strategies.
 
 A task directory contains: task.json (metadata + role->file map), spec.md (the only
 thing the model sees), reference/*.sol (fixture contracts keyed by role), tests/*.t.sol
@@ -80,7 +80,7 @@ def build_generator(
 def build_replay_generator(task_dir: str | Path, strategy: str = DEFAULT_STRATEGY):
     """An LLMGenerator whose transport REPLAYS the task's reference contracts as if a model
     produced them. Exercises the real adapter (prompt construction, Solidity extraction,
-    loop wiring) end-to-end, offline and deterministically (plan §9 replay mode)."""
+    loop wiring) end-to-end, offline and deterministically."""
     from falsify.generators.llm import LLMGenerator, RecordedTransport
 
     task_dir = Path(task_dir)

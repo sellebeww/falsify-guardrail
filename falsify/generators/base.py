@@ -3,7 +3,7 @@
 The interface is deliberately narrow. Generation sees only the natural-language
 spec; repair sees only a *minimal* feedback context (RepairContext) that, by
 construction, cannot contain PoC source or invariants. This enforces the
-anti-circularity rule in plan §4 at the type level rather than by convention.
+anti-circularity rule (docs/threat-model.md) at the type level rather than by convention.
 """
 
 from __future__ import annotations

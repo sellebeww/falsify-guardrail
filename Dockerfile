@@ -1,4 +1,4 @@
-# Reproducible Falsify environment (plan §9): pinned Python, Foundry, solc, Slither, Echidna.
+# Reproducible Falsify environment: pinned Python, Foundry, solc, Slither, Echidna.
 FROM python:3.11-slim
 
 ARG FOUNDRY_VERSION=1.8.3

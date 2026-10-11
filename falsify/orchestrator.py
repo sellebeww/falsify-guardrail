@@ -1,4 +1,4 @@
-"""The falsification loop (plan §3).
+"""The falsification loop (see docs/oracle-spec.md).
 
 Generate -> static analysis -> exploit oracle -> classify -> repair loop, where a
 repair is ACCEPTED only if (a) every confirming PoC now fails, (b) functional tests
@@ -227,7 +227,7 @@ class Orchestrator:
                     fates[f.id] = FindingFate.STILL_EXPLOITABLE
             record.false_fixes += false_fix_events
 
-            # Repair-acceptance predicate (plan §3).
+            # Repair-acceptance predicate (see docs/oracle-spec.md).
             if not_neutralized:
                 reason = RejectReason.NOT_NEUTRALIZED
             elif new_successes:
@@ -288,7 +288,7 @@ class Orchestrator:
 
     # ------------------------------------------------------------------ #
     def _classify(self, findings: list[Finding], exploits: list[ExploitResult]) -> None:
-        """Set each finding's status from the oracle result (plan §3)."""
+        """Set each finding's status from the oracle result (see docs/oracle-spec.md)."""
         covered = self.oracle.covered_classes()
         success_by_class: dict = {}
         for r in exploits:

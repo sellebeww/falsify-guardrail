@@ -1,5 +1,5 @@
 # Falsify toolchain lock — regenerate with `make setup` (scripts/bootstrap.sh)
-# Recorded into every run artifact for reproducibility (plan §5, §9).
+# Recorded into every run artifact for reproducibility.
 python   = 3.11.9
 forge    = forge Version: 1.8.3
 solc     = Version: 0.8.24+commit.e11b9ed9.Darwin.appleclang

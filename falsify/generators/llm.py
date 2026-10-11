@@ -1,12 +1,13 @@
 """Provider-neutral LLM generator/repair adapter.
 
 The adapter owns everything model-facing that Falsify controls — prompt construction,
-Solidity extraction, and the anti-circularity boundary (plan §4) — and delegates the actual
-model call to an injected *transport*: any callable `(system, prompt) -> text`. Plug in a
-client for whichever model you want to evaluate; Falsify ships no vendor-specific client.
+Solidity extraction, and the anti-circularity boundary (see docs/threat-model.md) — and
+delegates the actual model call to an injected *transport*: any callable
+`(system, prompt) -> text`. Plug in a client for whichever model you want to evaluate;
+Falsify ships no vendor-specific client.
 
-`RecordedTransport` replays canned responses (plan §9 replay mode), so the adapter and the
-full loop are testable offline and deterministically.
+`RecordedTransport` replays canned responses, so the adapter and the full loop are
+testable offline and deterministically.
 
 Generation sees only the spec; repair sees only the minimal RepairContext — never the PoC,
 invariants, or functional-test source.

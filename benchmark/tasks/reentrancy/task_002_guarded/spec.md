@@ -9,4 +9,4 @@ by a custom reentrancy guard, so no exploit succeeds. The correct behaviour for 
 exploit-confirmed guardrail is to report the Slither finding as UNCONFIRMED — not to force a
 change to an already-safe contract.
 
-> This `spec.md` is the ONLY artifact shown to the model under test (plan §4).
+> This `spec.md` is the ONLY artifact shown to the model under test (see docs/threat-model.md).

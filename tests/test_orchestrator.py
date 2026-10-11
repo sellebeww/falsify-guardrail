@@ -1,4 +1,4 @@
-"""Behavioural tests for the falsification loop (plan §3).
+"""Behavioural tests for the falsification loop (see docs/oracle-spec.md).
 
 These run entirely offline with in-memory fakes and are the executable spec for the
 project's honesty guarantees:

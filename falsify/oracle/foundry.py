@@ -1,4 +1,4 @@
-"""Foundry-backed compiler, functional tester, and exploit oracle (plan §3, §5).
+"""Foundry-backed compiler, functional tester, and exploit oracle (see docs/oracle-spec.md).
 
 Each candidate contract is dropped into a hermetic temp Foundry project (no forge-std
 or external libs — tests declare a minimal cheatcode interface inline), then `forge`
@@ -237,7 +237,7 @@ class FoundryOracle:
     """Runs the deterministic PoC battery. A passing PoC test == a confirmed exploit."""
 
     def __init__(self, covered: set[VulnClass] | None = None) -> None:
-        # Classes we ship at least one PoC template for (plan §7).
+        # Classes we ship at least one PoC template for.
         self._covered = covered or {VulnClass.REENTRANCY, VulnClass.ACCESS_CONTROL}
 
     def covered_classes(self) -> set[VulnClass]:

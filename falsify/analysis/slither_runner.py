@@ -1,4 +1,4 @@
-"""Slither-backed static analyzer (plan §5).
+"""Slither-backed static analyzer.
 
 Produces CANDIDATE findings only — fast and noisy, never a security gate. Slither
 exits non-zero when it has findings, so we parse the JSON regardless of exit code.

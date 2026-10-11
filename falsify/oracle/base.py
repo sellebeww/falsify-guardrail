@@ -2,7 +2,7 @@
 
 The Oracle is the falsification engine: it runs deterministic PoC exploits against
 a contract and reports which succeed. "Exploit failed" means UNCONFIRMED, never
-SECURE (plan §3, §10). Compiler and FunctionalTester model the Foundry side used
+SECURE (see docs/oracle-spec.md). Compiler and FunctionalTester model the Foundry side used
 by the repair-acceptance predicate.
 """
 

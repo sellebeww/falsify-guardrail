@@ -11,4 +11,4 @@ Requirements:
 - Only the owner may `sweep` funds **and** only the owner may change the owner via
   `setOwner`. An attacker must not be able to seize ownership or move funds.
 
-> This `spec.md` is the ONLY artifact shown to the model under test (plan §4).
+> This `spec.md` is the ONLY artifact shown to the model under test (see docs/threat-model.md).

@@ -1,4 +1,4 @@
-"""Pareto frontier: security (confirmed) vs gas efficiency (plan §7 scoring).
+"""Pareto frontier: security (confirmed) vs gas efficiency.
 
 Valid only when models are compared on an identical task set. MVP has one model, so
 this mainly supports v0.2 benchmark mode; it is kept generic and tested in isolation.

@@ -1,7 +1,7 @@
 """Static analysis interface.
 
 Slither is fast and noisy: it produces *candidate* findings only. Nothing here
-is ever a final security gate (plan §5) — confirmation is the oracle's job.
+is ever a final security gate — confirmation is the oracle's job.
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// HUMAN-OWNED functional suite (plan §4): the owner can custody and sweep funds, and can
+// HUMAN-OWNED functional suite (see docs/threat-model.md): the owner can custody and sweep funds, and can
 // hand ownership to a new owner. Passes on every stage (the fix preserves behaviour).
 
 import {Bank} from "../src/Bank.sol";

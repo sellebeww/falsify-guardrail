@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// HUMAN-AUTHORED Echidna invariant (plan §4) — never written by the model under test.
+// HUMAN-AUTHORED Echidna invariant (see docs/threat-model.md) — never written by the model under test.
 // Echidna deploys this contract (which deploys the Bank and is therefore its owner) and
 // fuzzes transactions from many senders against all contracts, trying to make an
 // echidna_* property return false. The invariant: ownership must never leave the deployer.

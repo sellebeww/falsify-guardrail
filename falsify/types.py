@@ -18,7 +18,7 @@ from enum import Enum
 class VulnClass(str, Enum):
     """Vulnerability classes the oracle has PoC templates for.
 
-    MVP scope is deliberately just two classes (see plan §7).
+    MVP scope is deliberately just two classes.
     """
 
     REENTRANCY = "reentrancy"
@@ -47,7 +47,7 @@ _SEVERITY_ORDER = [
 
 
 class FindingStatus(str, Enum):
-    """Lifecycle of a static-analysis finding under the exploit oracle (plan §3)."""
+    """Lifecycle of a static-analysis finding under the exploit oracle (see docs/oracle-spec.md)."""
 
     CANDIDATE = "candidate"          # raised by Slither, not yet tested
     CONFIRMED = "confirmed"          # a PoC exploit succeeds -> real
@@ -81,7 +81,7 @@ class FindingFate(str, Enum):
 
 
 class LoopVerdict(str, Enum):
-    """Terminal state of the repair loop (plan §3). Distinct and logged;
+    """Terminal state of the repair loop (see docs/oracle-spec.md). Distinct and logged;
     an unconfirmed result is never silently upgraded to 'secure'."""
 
     TOOL_ERROR = "tool_error"
@@ -103,7 +103,7 @@ GATE_PASSING = frozenset({LoopVerdict.SUCCESS, LoopVerdict.CLEAN, LoopVerdict.OR
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
 class ToolVersions:
-    """Recorded into every artifact for reproducibility (plan §5, §9)."""
+    """Recorded into every artifact for reproducibility."""
 
     python: str = ""
     forge: str = ""
@@ -132,12 +132,12 @@ class GasProfile:
 
 
 # --------------------------------------------------------------------------- #
-# Benchmark task (human-owned; see plan §4 anti-circularity)                   #
+# Benchmark task (human-owned; see docs/threat-model.md)                      #
 # --------------------------------------------------------------------------- #
 @dataclass
 class TaskSpec:
     """A benchmark task. The generator sees only `nl_spec`; the tests, invariants
-    and PoCs are human-owned and never shown to the model under test (plan §4)."""
+    and PoCs are human-owned and never shown to the model under test (see docs/threat-model.md)."""
 
     id: str
     category: VulnClass
@@ -209,7 +209,7 @@ class RepairAttempt:
 
 @dataclass
 class EvalRecord:
-    """The full, serializable record of one task/model run (plan §9)."""
+    """The full, serializable record of one task/model run."""
 
     task_id: str
     category: VulnClass

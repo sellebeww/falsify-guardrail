@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Idempotent toolchain setup for Falsify (plan §5, §9).
+# Idempotent toolchain setup for Falsify.
 # Installs: Python venv + pinned deps, Foundry (pinned), solc, Slither, Echidna (optional).
 # Foundry installs to ~/.foundry (global, reversible: rm -rf ~/.foundry).
 set -euo pipefail

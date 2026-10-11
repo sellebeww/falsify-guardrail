@@ -1,4 +1,4 @@
-"""Loop configuration (plan §3 stopping conditions)."""
+"""Loop configuration (see docs/oracle-spec.md)."""
 
 from __future__ import annotations
 

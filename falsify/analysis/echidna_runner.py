@@ -1,7 +1,7 @@
-"""Echidna property-fuzzing checker (plan §5): an INDEPENDENT, human-authored oracle.
+"""Echidna property-fuzzing checker: an INDEPENDENT, human-authored oracle.
 
 Echidna fuzzes transactions from many senders trying to falsify `echidna_*` invariants
-written by us (never by the model under test — plan §4). It is report-only and optional:
+written by us (never by the model under test). It is report-only and optional:
 the loop's gate remains the deterministic Foundry PoC. Echidna serves as a second oracle
 that cross-checks results and can catch violations a single hand-written PoC misses.
 """
@@ -17,7 +17,7 @@ from pathlib import Path
 from falsify import toolpaths
 from falsify.redact import sanitize
 
-# Fixed seed + single worker make every campaign reproducible (plan §9).
+# Fixed seed + single worker make every campaign reproducible.
 _CONFIG = (
     "testMode: property\nallContracts: true\ntestLimit: {limit}\n"
     "seed: {seed}\nworkers: 1\nbalanceContract: 100000000000000000000\n"

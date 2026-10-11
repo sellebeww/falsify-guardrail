@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// HUMAN-OWNED functional suite (plan §4). Verifies the treasury's intended behaviour:
+// HUMAN-OWNED functional suite (see docs/threat-model.md). Verifies the treasury's intended behaviour:
 // funds are held, and the owner can perform the privileged emergency kill.
 
 import {Treasury} from "../src/Treasury.sol";

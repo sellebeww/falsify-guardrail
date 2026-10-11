@@ -1,4 +1,4 @@
-"""Human-readable run report (plan §9). The JSON artifact remains the source of truth."""
+"""Human-readable run report. The JSON artifact remains the source of truth."""
 
 from __future__ import annotations
 

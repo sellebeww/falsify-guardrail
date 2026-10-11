@@ -1,4 +1,4 @@
-"""Build the minimal repair feedback (plan §4).
+"""Build the minimal repair feedback (see docs/threat-model.md).
 
 This is the *only* place repair feedback is assembled. It exists as a separate,
 testable unit so we can assert—by test—that PoC source, invariants, functional

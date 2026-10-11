@@ -1,4 +1,4 @@
-"""Deterministic fixture/replay generator (plan §9).
+"""Deterministic fixture/replay generator.
 
 Emits a recorded initial contract, then a scripted sequence of repair contracts.
 This makes `make demo` fully offline and reproducible (no API key, no nondeterminism)

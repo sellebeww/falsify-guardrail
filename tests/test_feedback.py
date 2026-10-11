@@ -1,4 +1,4 @@
-"""Anti-circularity tests (plan §4).
+"""Anti-circularity tests (see docs/threat-model.md).
 
 The repair feedback must never carry PoC source, invariants, functional-test
 source, or a reference implementation. We assert this two ways: the RepairContext
